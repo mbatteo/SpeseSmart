@@ -4,6 +4,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useAuth } from "@/hooks/useAuth";
 
 import Sidebar from "@/components/layout/sidebar";
 import MobileNav from "@/components/layout/mobile-nav";
@@ -13,39 +14,56 @@ import Categories from "@/pages/categories";
 import Budget from "@/pages/budget";
 import Accounts from "@/pages/accounts";
 import Reports from "@/pages/reports";
+import Landing from "@/pages/landing";
 import NotFound from "@/pages/not-found";
 
 function Router() {
+  const { isAuthenticated, isLoading } = useAuth();
+
   return (
     <Switch>
-      <Route path="/" component={Dashboard} />
-      <Route path="/transactions" component={Transactions} />
-      <Route path="/categories" component={Categories} />
-      <Route path="/budget" component={Budget} />
-      <Route path="/accounts" component={Accounts} />
-      <Route path="/reports" component={Reports} />
+      {isLoading || !isAuthenticated ? (
+        <Route path="/" component={Landing} />
+      ) : (
+        <>
+          <Route path="/" component={Dashboard} />
+          <Route path="/transactions" component={Transactions} />
+          <Route path="/categories" component={Categories} />
+          <Route path="/budget" component={Budget} />
+          <Route path="/accounts" component={Accounts} />
+          <Route path="/reports" component={Reports} />
+        </>
+      )}
       <Route component={NotFound} />
     </Switch>
   );
 }
 
-function App() {
+function AppContent() {
   const isMobile = useIsMobile();
+  const { isAuthenticated, isLoading } = useAuth();
 
   return (
+    <TooltipProvider>
+      <div className="min-h-screen flex bg-slate-50">
+        {!isLoading && isAuthenticated && !isMobile && <Sidebar />}
+        
+        <main className={`flex-1 ${!isLoading && isAuthenticated && !isMobile ? 'lg:ml-64' : ''}`}>
+          <Router />
+        </main>
+        
+        {!isLoading && isAuthenticated && isMobile && <MobileNav />}
+      </div>
+      
+      <Toaster />
+    </TooltipProvider>
+  );
+}
+
+function App() {
+  return (
     <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <div className="min-h-screen flex bg-slate-50">
-          {!isMobile && <Sidebar />}
-          
-          <main className={`flex-1 ${!isMobile ? 'lg:ml-64' : ''}`}>
-            <Router />
-          </main>
-          
-          {isMobile && <MobileNav />}
-        </div>
-        <Toaster />
-      </TooltipProvider>
+      <AppContent />
     </QueryClientProvider>
   );
 }

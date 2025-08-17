@@ -1,7 +1,28 @@
-import { type Transaction, type InsertTransaction, type Category, type InsertCategory, type Account, type InsertAccount, type Budget, type InsertBudget } from "@shared/schema";
-import { randomUUID } from "crypto";
+import { 
+  type Transaction, 
+  type InsertTransaction, 
+  type Category, 
+  type InsertCategory, 
+  type Account, 
+  type InsertAccount, 
+  type Budget, 
+  type InsertBudget,
+  type User,
+  type UpsertUser,
+  users,
+  transactions,
+  categories,
+  accounts,
+  budgets
+} from "@shared/schema";
+import { db } from "./db";
+import { eq } from "drizzle-orm";
 
 export interface IStorage {
+  // User operations (required for Replit Auth)
+  getUser(id: string): Promise<User | undefined>;
+  upsertUser(user: UpsertUser): Promise<User>;
+  
   // Transactions
   getTransactions(): Promise<Transaction[]>;
   getTransactionById(id: string): Promise<Transaction | undefined>;
@@ -31,190 +52,211 @@ export interface IStorage {
   deleteBudget(id: string): Promise<boolean>;
 }
 
-export class MemStorage implements IStorage {
-  private transactions: Map<string, Transaction>;
-  private categories: Map<string, Category>;
-  private accounts: Map<string, Account>;
-  private budgets: Map<string, Budget>;
-
+export class DatabaseStorage implements IStorage {
   constructor() {
-    this.transactions = new Map();
-    this.categories = new Map();
-    this.accounts = new Map();
-    this.budgets = new Map();
-    
     this.initializeDefaultData();
   }
 
-  private initializeDefaultData() {
+  private async initializeDefaultData() {
+    // Check if data already exists
+    const existingCategories = await db.select().from(categories).limit(1);
+    if (existingCategories.length > 0) return;
+
     // Default categories
-    const defaultCategories: Category[] = [
-      { id: randomUUID(), name: 'Alimentari', color: '#EF4444', icon: 'fas fa-shopping-cart' },
-      { id: randomUUID(), name: 'Trasporti', color: '#3B82F6', icon: 'fas fa-bus' },
-      { id: randomUUID(), name: 'Shopping', color: '#10B981', icon: 'fas fa-shopping-bag' },
-      { id: randomUUID(), name: 'Bollette', color: '#F59E0B', icon: 'fas fa-bolt' },
-      { id: randomUUID(), name: 'Intrattenimento', color: '#8B5CF6', icon: 'fas fa-film' },
-      { id: randomUUID(), name: 'Salute', color: '#EC4899', icon: 'fas fa-heartbeat' },
-      { id: randomUUID(), name: 'Altro', color: '#6B7280', icon: 'fas fa-tag' },
+    const defaultCategories = [
+      { name: 'Alimentari', color: '#EF4444', icon: 'fas fa-shopping-cart' },
+      { name: 'Trasporti', color: '#3B82F6', icon: 'fas fa-bus' },
+      { name: 'Shopping', color: '#10B981', icon: 'fas fa-shopping-bag' },
+      { name: 'Bollette', color: '#F59E0B', icon: 'fas fa-bolt' },
+      { name: 'Intrattenimento', color: '#8B5CF6', icon: 'fas fa-film' },
+      { name: 'Salute', color: '#EC4899', icon: 'fas fa-heartbeat' },
+      { name: 'Altro', color: '#6B7280', icon: 'fas fa-tag' },
     ];
 
-    defaultCategories.forEach(category => {
-      this.categories.set(category.id, category);
-    });
+    await db.insert(categories).values(defaultCategories);
 
     // Default accounts
-    const defaultAccounts: Account[] = [
-      { id: randomUUID(), name: 'Conto Corrente', type: 'checking', balance: '2500.00' },
-      { id: randomUUID(), name: 'Carta di Credito', type: 'credit', balance: '0.00' },
-      { id: randomUUID(), name: 'Carta di Debito', type: 'debit', balance: '500.00' },
-      { id: randomUUID(), name: 'Contanti', type: 'cash', balance: '150.00' },
+    const defaultAccounts = [
+      { name: 'Conto Corrente', type: 'checking', balance: '2500.00' },
+      { name: 'Carta di Credito', type: 'credit', balance: '0.00' },
+      { name: 'Carta di Debito', type: 'debit', balance: '500.00' },
+      { name: 'Contanti', type: 'cash', balance: '150.00' },
     ];
 
-    defaultAccounts.forEach(account => {
-      this.accounts.set(account.id, account);
-    });
+    await db.insert(accounts).values(defaultAccounts);
   }
 
-  // Transaction methods
+  // User operations (required for Replit Auth)
+  async getUser(id: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user;
+  }
+
+  async upsertUser(userData: UpsertUser): Promise<User> {
+    const [user] = await db
+      .insert(users)
+      .values(userData)
+      .onConflictDoUpdate({
+        target: users.id,
+        set: {
+          ...userData,
+          updatedAt: new Date(),
+        },
+      })
+      .returning();
+    return user;
+  }
+
+  // Transactions
   async getTransactions(): Promise<Transaction[]> {
-    return Array.from(this.transactions.values()).sort((a, b) => 
-      new Date(b.date).getTime() - new Date(a.date).getTime()
-    );
+    return await db.select().from(transactions).orderBy(transactions.date);
   }
 
   async getTransactionById(id: string): Promise<Transaction | undefined> {
-    return this.transactions.get(id);
-  }
-
-  async createTransaction(insertTransaction: InsertTransaction): Promise<Transaction> {
-    const id = randomUUID();
-    const transaction: Transaction = {
-      ...insertTransaction,
-      id,
-      date: new Date(insertTransaction.date),
-      createdAt: new Date(),
-    };
-    this.transactions.set(id, transaction);
+    const [transaction] = await db.select().from(transactions).where(eq(transactions.id, id));
     return transaction;
   }
 
-  async updateTransaction(id: string, updates: Partial<InsertTransaction>): Promise<Transaction | undefined> {
-    const transaction = this.transactions.get(id);
-    if (!transaction) return undefined;
+  async createTransaction(insertTransaction: InsertTransaction): Promise<Transaction> {
+    const date = typeof insertTransaction.date === 'string' 
+      ? new Date(insertTransaction.date)
+      : insertTransaction.date;
+    
+    const [transaction] = await db
+      .insert(transactions)
+      .values({
+        ...insertTransaction,
+        date,
+      })
+      .returning();
+    return transaction;
+  }
 
-    const updatedTransaction: Transaction = {
-      ...transaction,
-      ...updates,
-      date: updates.date ? new Date(updates.date) : transaction.date,
-    };
-    this.transactions.set(id, updatedTransaction);
-    return updatedTransaction;
+  async updateTransaction(id: string, update: Partial<InsertTransaction>): Promise<Transaction | undefined> {
+    const updateData: any = { ...update };
+    if (update.date) {
+      updateData.date = typeof update.date === 'string' ? new Date(update.date) : update.date;
+    }
+    
+    const [transaction] = await db
+      .update(transactions)
+      .set(updateData)
+      .where(eq(transactions.id, id))
+      .returning();
+    return transaction;
   }
 
   async deleteTransaction(id: string): Promise<boolean> {
-    return this.transactions.delete(id);
+    const result = await db.delete(transactions).where(eq(transactions.id, id));
+    return (result.rowCount ?? 0) > 0;
   }
 
-  // Category methods
+  // Categories
   async getCategories(): Promise<Category[]> {
-    return Array.from(this.categories.values());
+    return await db.select().from(categories);
   }
 
   async getCategoryById(id: string): Promise<Category | undefined> {
-    return this.categories.get(id);
-  }
-
-  async createCategory(insertCategory: InsertCategory): Promise<Category> {
-    const id = randomUUID();
-    const category: Category = { 
-      ...insertCategory, 
-      id,
-      color: insertCategory.color || '#6B7280',
-      icon: insertCategory.icon || 'fas fa-tag'
-    };
-    this.categories.set(id, category);
+    const [category] = await db.select().from(categories).where(eq(categories.id, id));
     return category;
   }
 
-  async updateCategory(id: string, updates: Partial<InsertCategory>): Promise<Category | undefined> {
-    const category = this.categories.get(id);
-    if (!category) return undefined;
+  async createCategory(insertCategory: InsertCategory): Promise<Category> {
+    const [category] = await db
+      .insert(categories)
+      .values({
+        ...insertCategory,
+        color: insertCategory.color || '#6B7280',
+        icon: insertCategory.icon || 'fas fa-tag'
+      })
+      .returning();
+    return category;
+  }
 
-    const updatedCategory: Category = { ...category, ...updates };
-    this.categories.set(id, updatedCategory);
-    return updatedCategory;
+  async updateCategory(id: string, update: Partial<InsertCategory>): Promise<Category | undefined> {
+    const [category] = await db
+      .update(categories)
+      .set(update)
+      .where(eq(categories.id, id))
+      .returning();
+    return category;
   }
 
   async deleteCategory(id: string): Promise<boolean> {
-    return this.categories.delete(id);
+    const result = await db.delete(categories).where(eq(categories.id, id));
+    return (result.rowCount ?? 0) > 0;
   }
 
-  // Account methods
+  // Accounts
   async getAccounts(): Promise<Account[]> {
-    return Array.from(this.accounts.values());
+    return await db.select().from(accounts);
   }
 
   async getAccountById(id: string): Promise<Account | undefined> {
-    return this.accounts.get(id);
-  }
-
-  async createAccount(insertAccount: InsertAccount): Promise<Account> {
-    const id = randomUUID();
-    const account: Account = { 
-      ...insertAccount, 
-      id,
-      balance: insertAccount.balance || '0'
-    };
-    this.accounts.set(id, account);
+    const [account] = await db.select().from(accounts).where(eq(accounts.id, id));
     return account;
   }
 
-  async updateAccount(id: string, updates: Partial<InsertAccount>): Promise<Account | undefined> {
-    const account = this.accounts.get(id);
-    if (!account) return undefined;
+  async createAccount(insertAccount: InsertAccount): Promise<Account> {
+    const [account] = await db
+      .insert(accounts)
+      .values({
+        ...insertAccount,
+        balance: insertAccount.balance || '0'
+      })
+      .returning();
+    return account;
+  }
 
-    const updatedAccount: Account = { ...account, ...updates };
-    this.accounts.set(id, updatedAccount);
-    return updatedAccount;
+  async updateAccount(id: string, update: Partial<InsertAccount>): Promise<Account | undefined> {
+    const [account] = await db
+      .update(accounts)
+      .set(update)
+      .where(eq(accounts.id, id))
+      .returning();
+    return account;
   }
 
   async deleteAccount(id: string): Promise<boolean> {
-    return this.accounts.delete(id);
+    const result = await db.delete(accounts).where(eq(accounts.id, id));
+    return (result.rowCount ?? 0) > 0;
   }
 
-  // Budget methods
+  // Budgets
   async getBudgets(): Promise<Budget[]> {
-    return Array.from(this.budgets.values());
+    return await db.select().from(budgets);
   }
 
   async getBudgetById(id: string): Promise<Budget | undefined> {
-    return this.budgets.get(id);
-  }
-
-  async createBudget(insertBudget: InsertBudget): Promise<Budget> {
-    const id = randomUUID();
-    const budget: Budget = { 
-      ...insertBudget, 
-      id,
-      period: insertBudget.period || 'monthly',
-      month: insertBudget.month || null
-    };
-    this.budgets.set(id, budget);
+    const [budget] = await db.select().from(budgets).where(eq(budgets.id, id));
     return budget;
   }
 
-  async updateBudget(id: string, updates: Partial<InsertBudget>): Promise<Budget | undefined> {
-    const budget = this.budgets.get(id);
-    if (!budget) return undefined;
+  async createBudget(insertBudget: InsertBudget): Promise<Budget> {
+    const [budget] = await db
+      .insert(budgets)
+      .values({
+        ...insertBudget,
+        period: insertBudget.period || 'monthly',
+        month: insertBudget.month || null
+      })
+      .returning();
+    return budget;
+  }
 
-    const updatedBudget: Budget = { ...budget, ...updates };
-    this.budgets.set(id, updatedBudget);
-    return updatedBudget;
+  async updateBudget(id: string, update: Partial<InsertBudget>): Promise<Budget | undefined> {
+    const [budget] = await db
+      .update(budgets)
+      .set(update)
+      .where(eq(budgets.id, id))
+      .returning();
+    return budget;
   }
 
   async deleteBudget(id: string): Promise<boolean> {
-    return this.budgets.delete(id);
+    const result = await db.delete(budgets).where(eq(budgets.id, id));
+    return (result.rowCount ?? 0) > 0;
   }
 }
 
-export const storage = new MemStorage();
+export const storage = new DatabaseStorage();

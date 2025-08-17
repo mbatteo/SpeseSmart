@@ -6,11 +6,16 @@ import CategoryChart from "@/components/dashboard/category-chart";
 import TopCategories from "@/components/dashboard/top-categories";
 import TransactionTable from "@/components/transactions/transaction-table";
 import AddTransactionModal from "@/components/transactions/add-transaction-modal";
+import ImportExpensesModal from "@/components/import/import-expenses-modal";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
 import { apiRequest } from "@/lib/queryClient";
+import { Button } from "@/components/ui/button";
+import { LogOut } from "lucide-react";
 
 export default function Dashboard() {
   const { toast } = useToast();
+  const { user } = useAuth();
 
   const { data: transactions = [], isLoading: transactionsLoading } = useQuery<Transaction[]>({
     queryKey: ['/api/transactions'],
@@ -114,16 +119,41 @@ export default function Dashboard() {
             </div>
             
             <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-2 text-sm text-emerald-600">
-                <i className="fas fa-sync-alt"></i>
-                <span>Aggiornato ora</span>
-              </div>
+              {user && (
+                <div className="flex items-center space-x-3">
+                  <div className="text-sm text-right">
+                    <p className="font-medium text-slate-900">
+                      Ciao, {user.firstName || user.email?.split('@')[0] || 'Utente'}!
+                    </p>
+                    <p className="text-slate-500">Benvenuto nella tua dashboard</p>
+                  </div>
+                  {user.profileImageUrl && (
+                    <img 
+                      src={user.profileImageUrl} 
+                      alt="Profile" 
+                      className="w-8 h-8 rounded-full object-cover"
+                    />
+                  )}
+                </div>
+              )}
+              
+              <ImportExpensesModal />
               
               <AddTransactionModal
                 categories={categories}
                 accounts={accounts}
                 onSubmit={handleAddTransaction}
               />
+              
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => window.location.href = '/api/logout'}
+                data-testid="button-logout"
+              >
+                <LogOut className="h-4 w-4 mr-2" />
+                Esci
+              </Button>
             </div>
           </div>
         </div>
