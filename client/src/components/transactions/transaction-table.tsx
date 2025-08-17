@@ -1,0 +1,211 @@
+import { useState } from "react";
+import { formatCurrency, formatDate, formatTime, ACCOUNT_TYPES } from "@/lib/constants";
+import { Transaction, Category, Account } from "@shared/schema";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
+interface TransactionTableProps {
+  transactions: Transaction[];
+  categories: Category[];
+  accounts: Account[];
+  onEdit: (transaction: Transaction) => void;
+  onDelete: (id: string) => void;
+}
+
+export default function TransactionTable({ 
+  transactions, 
+  categories, 
+  accounts, 
+  onEdit, 
+  onDelete 
+}: TransactionTableProps) {
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState<string>("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+
+  const getCategoryById = (id: string) => categories.find(c => c.id === id);
+  const getAccountById = (id: string) => accounts.find(a => a.id === id);
+
+  const filteredTransactions = transactions.filter(transaction => {
+    const matchesSearch = transaction.description.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesCategory = !selectedCategory || selectedCategory === "all" || transaction.categoryId === selectedCategory;
+    return matchesSearch && matchesCategory;
+  });
+
+  const totalPages = Math.ceil(filteredTransactions.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const paginatedTransactions = filteredTransactions.slice(startIndex, startIndex + itemsPerPage);
+
+  return (
+    <div className="bg-white rounded-xl shadow-sm border border-slate-200">
+      <div className="p-6 border-b border-slate-200">
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-semibold text-slate-900">Transazioni Recenti</h3>
+          <button className="text-sm text-primary-600 hover:text-primary-700 font-medium">
+            Visualizza Tutte
+          </button>
+        </div>
+      </div>
+      
+      {/* Search and Filter */}
+      <div className="p-6 border-b border-slate-200 bg-slate-50">
+        <div className="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4">
+          <div className="flex-1">
+            <div className="relative">
+              <i className="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400"></i>
+              <Input
+                type="text"
+                placeholder="Cerca transazioni..."
+                className="pl-10"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                data-testid="input-search-transactions"
+              />
+            </div>
+          </div>
+          <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+            <SelectTrigger className="w-48" data-testid="select-category-filter">
+              <SelectValue placeholder="Tutte le categorie" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Tutte le categorie</SelectItem>
+              {categories.map(category => (
+                <SelectItem key={category.id} value={category.id}>
+                  {category.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      {/* Transactions Table */}
+      <div className="overflow-x-auto">
+        <table className="w-full">
+          <thead className="bg-slate-50 border-b border-slate-200">
+            <tr>
+              <th className="text-left py-3 px-6 text-xs font-medium text-slate-500 uppercase tracking-wider">Data</th>
+              <th className="text-left py-3 px-6 text-xs font-medium text-slate-500 uppercase tracking-wider">Descrizione</th>
+              <th className="text-left py-3 px-6 text-xs font-medium text-slate-500 uppercase tracking-wider">Categoria</th>
+              <th className="text-left py-3 px-6 text-xs font-medium text-slate-500 uppercase tracking-wider">Conto</th>
+              <th className="text-right py-3 px-6 text-xs font-medium text-slate-500 uppercase tracking-wider">Importo</th>
+              <th className="text-center py-3 px-6 text-xs font-medium text-slate-500 uppercase tracking-wider">Azioni</th>
+            </tr>
+          </thead>
+          <tbody className="bg-white divide-y divide-slate-200">
+            {paginatedTransactions.length > 0 ? (
+              paginatedTransactions.map((transaction) => {
+                const category = getCategoryById(transaction.categoryId);
+                const account = getAccountById(transaction.accountId);
+                
+                return (
+                  <tr key={transaction.id} className="hover:bg-slate-50" data-testid={`transaction-row-${transaction.id}`}>
+                    <td className="py-4 px-6 text-sm text-slate-600">
+                      <div>
+                        <p className="font-medium">{formatDate(transaction.date)}</p>
+                        <p className="text-xs text-slate-500">{formatTime(transaction.date)}</p>
+                      </div>
+                    </td>
+                    <td className="py-4 px-6">
+                      <div>
+                        <p className="font-medium text-slate-900">{transaction.description}</p>
+                        <p className="text-xs text-slate-500">{account?.name}</p>
+                      </div>
+                    </td>
+                    <td className="py-4 px-6">
+                      {category && (
+                        <Badge 
+                          variant="secondary" 
+                          className="inline-flex items-center"
+                          style={{ 
+                            backgroundColor: `${category.color}20`, 
+                            color: category.color,
+                            border: `1px solid ${category.color}40`
+                          }}
+                        >
+                          <i className={`${category.icon} mr-1`} />
+                          {category.name}
+                        </Badge>
+                      )}
+                    </td>
+                    <td className="py-4 px-6 text-sm text-slate-600">
+                      {account && ACCOUNT_TYPES[account.type as keyof typeof ACCOUNT_TYPES]}
+                    </td>
+                    <td className="py-4 px-6 text-right">
+                      <span className="font-semibold text-red-600" data-testid={`amount-${transaction.id}`}>
+                        -{formatCurrency(parseFloat(transaction.amount))}
+                      </span>
+                    </td>
+                    <td className="py-4 px-6 text-center">
+                      <div className="flex items-center justify-center space-x-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => onEdit(transaction)}
+                          data-testid={`button-edit-${transaction.id}`}
+                        >
+                          <i className="fas fa-edit text-slate-400 hover:text-primary-500" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => onDelete(transaction.id)}
+                          data-testid={`button-delete-${transaction.id}`}
+                        >
+                          <i className="fas fa-trash text-slate-400 hover:text-red-500" />
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })
+            ) : (
+              <tr>
+                <td colSpan={6} className="py-8 text-center text-slate-500">
+                  <div>
+                    <i className="fas fa-receipt text-2xl mb-2"></i>
+                    <p>Nessuna transazione trovata</p>
+                  </div>
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Pagination */}
+      {filteredTransactions.length > 0 && (
+        <div className="px-6 py-4 border-t border-slate-200 bg-slate-50">
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-slate-700">
+              Mostrando <span className="font-medium">{startIndex + 1}-{Math.min(startIndex + itemsPerPage, filteredTransactions.length)}</span> di <span className="font-medium">{filteredTransactions.length}</span> transazioni
+            </p>
+            <div className="flex items-center space-x-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                disabled={currentPage === 1}
+                data-testid="button-previous-page"
+              >
+                Precedente
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                disabled={currentPage === totalPages}
+                data-testid="button-next-page"
+              >
+                Successiva
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
