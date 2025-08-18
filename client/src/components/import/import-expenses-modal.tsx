@@ -197,13 +197,41 @@ export default function ImportExpensesModal() {
           // Prova diversi formati di data
           const dateParts = dateStr.split(/[\/\-\.]/);
           if (dateParts.length === 3) {
-            // Supponi dd/mm/yyyy o dd-mm-yyyy
-            const day = dateParts[0].padStart(2, '0');
-            const month = dateParts[1].padStart(2, '0');
-            const year = dateParts[2];
-            isoDate = `${year}-${month}-${day}`;
+            let day, month, year;
+            
+            // Rileva il formato della data
+            if (dateParts[2].length === 4) {
+              // Formato dd/mm/yyyy o dd-mm-yyyy
+              day = dateParts[0].padStart(2, '0');
+              month = dateParts[1].padStart(2, '0');
+              year = dateParts[2];
+            } else if (dateParts[0].length === 4) {
+              // Formato yyyy/mm/dd o yyyy-mm-dd
+              year = dateParts[0];
+              month = dateParts[1].padStart(2, '0');
+              day = dateParts[2].padStart(2, '0');
+            } else {
+              // Default: supponi dd/mm/yy e converti in 20yy
+              day = dateParts[0].padStart(2, '0');
+              month = dateParts[1].padStart(2, '0');
+              year = '20' + dateParts[2].padStart(2, '0');
+            }
+            
+            // Verifica che la data sia valida
+            const testDate = new Date(`${year}-${month}-${day}`);
+            if (!isNaN(testDate.getTime())) {
+              isoDate = `${year}-${month}-${day}`;
+            } else {
+              isoDate = new Date().toISOString().split('T')[0];
+            }
           } else {
-            isoDate = new Date().toISOString().split('T')[0];
+            // Prova a parsare direttamente
+            const parsed = new Date(dateStr);
+            if (!isNaN(parsed.getTime())) {
+              isoDate = parsed.toISOString().split('T')[0];
+            } else {
+              isoDate = new Date().toISOString().split('T')[0];
+            }
           }
         } catch {
           isoDate = new Date().toISOString().split('T')[0];

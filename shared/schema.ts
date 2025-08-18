@@ -70,7 +70,13 @@ export const insertTransactionSchema = createInsertSchema(transactions).omit({
   id: true,
   createdAt: true,
 }).extend({
-  date: z.string().or(z.date()),
+  date: z.string().or(z.date()).transform((val) => {
+    if (typeof val === 'string') {
+      return new Date(val);
+    }
+    return val;
+  }),
+  amount: z.number().or(z.string().transform(val => parseFloat(val))),
 });
 
 export const insertBudgetSchema = createInsertSchema(budgets).omit({

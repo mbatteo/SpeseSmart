@@ -7,6 +7,16 @@ This is a full-stack expense tracking application built with React and Express. 
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.
+Application language: Italian interface and messages.
+
+## Recent Changes (January 18, 2025)
+
+✓ **Authentication System**: Implemented complete Replit OAuth integration with PostgreSQL session storage
+✓ **CSV Import Functionality**: Advanced expense import with column mapping and preview
+✓ **Database Security**: All API endpoints now require authentication
+✓ **User Interface**: Italian language throughout, responsive design with user profiles
+✓ **Date Handling**: Improved date parsing for multiple formats (DD/MM/YYYY, YYYY-MM-DD, etc.)
+✓ **Error Handling**: Enhanced validation and error messages for transaction creation
 
 ## System Architecture
 
@@ -34,12 +44,17 @@ Preferred communication style: Simple, everyday language.
   - `categories` - Expense categories with customizable colors and icons
   - `accounts` - Bank accounts, credit cards, and cash accounts with balances
   - `budgets` - Monthly/yearly budget limits per category
+  - `users` - User profiles with email, name, and authentication data
+  - `sessions` - Session storage for authentication
 - **Relationships**: Proper foreign key relationships between transactions, categories, and accounts
+- **CSV Import**: Advanced CSV parsing with column mapping, date format detection, and transaction preview
 
 ### Authentication & Authorization
-- Currently using basic session-based approach
-- Session storage configured with connect-pg-simple for PostgreSQL session store
-- Ready for future implementation of user authentication and multi-user support
+- **Replit OAuth Integration**: Full authentication system with Replit as OpenID Connect provider
+- **Session Management**: PostgreSQL-based session storage with connect-pg-simple
+- **Protected Routes**: All API endpoints require authentication via isAuthenticated middleware
+- **User Management**: Complete user profile system with email, name, and profile image support
+- **Landing Page**: Separate interface for unauthenticated users with login functionality
 
 ### Development & Deployment
 - **Development**: Unified development server with Vite handling frontend and Express handling API

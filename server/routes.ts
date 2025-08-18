@@ -21,7 +21,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Transaction routes
-  app.get("/api/transactions", async (req, res) => {
+  app.get("/api/transactions", isAuthenticated, async (req, res) => {
     try {
       const transactions = await storage.getTransactions();
       res.json(transactions);
@@ -42,13 +42,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/transactions", async (req, res) => {
+  app.post("/api/transactions", isAuthenticated, async (req, res) => {
     try {
+      console.log("Received transaction data:", req.body);
+      
       const validatedData = insertTransactionSchema.parse(req.body);
+      console.log("Validated data:", validatedData);
+      
       const transaction = await storage.createTransaction(validatedData);
       res.status(201).json(transaction);
-    } catch (error) {
-      res.status(400).json({ message: "Dati transazione non validi" });
+    } catch (error: any) {
+      console.error("Transaction validation error:", error);
+      if (error.issues) {
+        console.error("Zod validation issues:", error.issues);
+      }
+      res.status(400).json({ 
+        message: "Dati transazione non validi", 
+        details: error.issues || error.message 
+      });
     }
   });
 
@@ -78,7 +89,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Category routes
-  app.get("/api/categories", async (req, res) => {
+  app.get("/api/categories", isAuthenticated, async (req, res) => {
     try {
       const categories = await storage.getCategories();
       res.json(categories);
@@ -123,7 +134,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Account routes
-  app.get("/api/accounts", async (req, res) => {
+  app.get("/api/accounts", isAuthenticated, async (req, res) => {
     try {
       const accounts = await storage.getAccounts();
       res.json(accounts);
@@ -213,7 +224,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Dashboard analytics routes
-  app.get("/api/analytics/monthly-summary", async (req, res) => {
+  app.get("/api/analytics/monthly-summary", isAuthenticated, async (req, res) => {
     try {
       const transactions = await storage.getTransactions();
       const categories = await storage.getCategories();
