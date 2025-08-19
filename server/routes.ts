@@ -223,26 +223,65 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Dashboard analytics routes
+  // Route per ottenere statistiche mensili della dashboard con dati dinamici
   app.get("/api/analytics/monthly-summary", isAuthenticated, async (req, res) => {
     try {
+      // Recupero tutti i dati necessari dal database
       const transactions = await storage.getTransactions();
       const categories = await storage.getCategories();
       const accounts = await storage.getAccounts();
       
+      // Calcolo le date per questo mese e il mese scorso
       const now = new Date();
       const currentMonth = now.getMonth();
       const currentYear = now.getFullYear();
       
+      // Data di inizio del mese corrente
+      const startOfMonth = new Date(currentYear, currentMonth, 1);
+      // Data di inizio del mese scorso
+      const startOfLastMonth = new Date(currentYear, currentMonth - 1, 1);
+      // Data di inizio di questo mese (per confrontare con il mese scorso)
+      const endOfLastMonth = new Date(currentYear, currentMonth, 0);
+      
+      // Filtro transazioni del mese corrente
       const monthlyTransactions = transactions.filter(t => {
         const transactionDate = new Date(t.date);
         return transactionDate.getMonth() === currentMonth && 
                transactionDate.getFullYear() === currentYear;
       });
 
+      // Filtro transazioni del mese scorso per il confronto
+      const lastMonthTransactions = transactions.filter(t => {
+        const transactionDate = new Date(t.date);
+        return transactionDate >= startOfLastMonth && transactionDate <= endOfLastMonth;
+      });
+
+      // Filtro transazioni di oggi
+      const today = new Date();
+      const todayTransactions = transactions.filter(t => {
+        const transactionDate = new Date(t.date);
+        return transactionDate.toDateString() === today.toDateString();
+      });
+
+      // Calcolo le statistiche principali
       const totalExpenses = monthlyTransactions.reduce((sum, t) => sum + parseFloat(t.amount), 0);
+      const lastMonthExpenses = lastMonthTransactions.reduce((sum, t) => sum + parseFloat(t.amount), 0);
       const transactionCount = monthlyTransactions.length;
       const dailyAverage = totalExpenses / now.getDate();
+      
+      // Calcolo il confronto percentuale con il mese scorso
+      const monthlyChange = lastMonthExpenses !== 0 
+        ? ((totalExpenses - lastMonthExpenses) / Math.abs(lastMonthExpenses)) * 100 
+        : 0;
+      
+      // Calcolo transazioni di oggi
+      const todayTransactionCount = todayTransactions.length;
+      
+      // Determino il trend della media giornaliera
+      const lastWeekAverage = totalExpenses / 7; // Media ultimi 7 giorni del mese
+      const trendStatus = dailyAverage > lastWeekAverage * 1.1 ? 'In crescita' 
+                        : dailyAverage < lastWeekAverage * 0.9 ? 'In calo' 
+                        : 'Stabile';
 
       const categorySpending = categories.map(category => {
         const categoryTransactions = monthlyTransactions.filter(t => t.categoryId === category.id);
@@ -254,13 +293,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         };
       }).sort((a, b) => b.amount - a.amount);
 
+      // Creo la risposta JSON con tutti i dati dinamici calcolati
       res.json({
-        totalExpenses,
-        transactionCount,
-        dailyAverage,
-        categorySpending,
-        remainingBudget: 4000 - totalExpenses, // Mock budget
-        budgetUsedPercentage: totalExpenses / 4000 * 100
+        totalExpenses, // Spese totali del mese
+        transactionCount, // Numero transazioni del mese
+        dailyAverage, // Media giornaliera delle spese
+        categorySpending, // Spese per categoria con percentuali
+        remainingBudget: 4000 - totalExpenses, // Budget rimanente (TODO: rendere dinamico)
+        budgetUsedPercentage: totalExpenses / 4000 * 100, // Percentuale budget utilizzata
+        // Nuovi dati dinamici per sostituire quelli hardcodati
+        monthlyChange, // Variazione percentuale vs mese scorso
+        todayTransactionCount, // Numero transazioni di oggi
+        trendStatus, // Trend della media giornaliera
       });
     } catch (error) {
       res.status(500).json({ message: "Errore nel calcolo delle statistiche" });

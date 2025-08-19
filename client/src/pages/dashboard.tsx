@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
-import type { Transaction, Category, Account } from "@shared/schema";
+import type { Transaction, Category, Account, User } from "@shared/schema";
 import StatsCards from "@/components/dashboard/stats-cards";
 import CategoryChart from "@/components/dashboard/category-chart";
 import TopCategories from "@/components/dashboard/top-categories";
@@ -15,7 +15,7 @@ import { LogOut } from "lucide-react";
 
 export default function Dashboard() {
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { user } = useAuth() as { user: User | null };
 
   const { data: transactions = [], isLoading: transactionsLoading } = useQuery<Transaction[]>({
     queryKey: ['/api/transactions'],
@@ -29,13 +29,14 @@ export default function Dashboard() {
     queryKey: ['/api/accounts'],
   });
 
+  // Query per ottenere le statistiche della dashboard con i nuovi dati dinamici
   const { data: analytics, isLoading: analyticsLoading } = useQuery<{
-    totalExpenses: number;
-    remainingBudget: number;
-    budgetUsedPercentage: number;
-    transactionCount: number;
-    dailyAverage: number;
-    categorySpending: Array<{
+    totalExpenses: number; // Spese totali del mese
+    remainingBudget: number; // Budget rimanente
+    budgetUsedPercentage: number; // Percentuale budget utilizzata
+    transactionCount: number; // Numero transazioni mensili
+    dailyAverage: number; // Media giornaliera delle spese
+    categorySpending: Array<{ // Spese per categoria
       id: string;
       name: string;
       color: string;
@@ -43,6 +44,10 @@ export default function Dashboard() {
       amount: number;
       percentage: number;
     }>;
+    // Nuovi campi dinamici per sostituire dati hardcodati
+    monthlyChange: number; // Variazione percentuale vs mese scorso
+    todayTransactionCount: number; // Transazioni di oggi
+    trendStatus: string; // Trend della media giornaliera ('In crescita', 'In calo', 'Stabile')
   }>({
     queryKey: ['/api/analytics/monthly-summary'],
   });
@@ -160,7 +165,7 @@ export default function Dashboard() {
       </header>
 
       <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-6 pb-20 lg:pb-6">
-        {/* Stats Cards */}
+        {/* Carte delle statistiche con dati dinamici dal server */}
         {analytics && (
           <StatsCards
             monthlyExpenses={analytics.totalExpenses || 0}
@@ -168,6 +173,10 @@ export default function Dashboard() {
             budgetUsedPercentage={analytics.budgetUsedPercentage || 0}
             transactionCount={analytics.transactionCount || 0}
             dailyAverage={analytics.dailyAverage || 0}
+            // Passo i nuovi dati dinamici per sostituire quelli hardcodati
+            monthlyChange={analytics.monthlyChange || 0}
+            todayTransactionCount={analytics.todayTransactionCount || 0}
+            trendStatus={analytics.trendStatus || 'Stabile'}
           />
         )}
 
