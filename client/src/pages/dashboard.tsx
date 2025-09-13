@@ -12,7 +12,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { LogOut } from "lucide-react";
-
+/** This is a test. */
 export default function Dashboard() {
   const { toast } = useToast();
   const { user } = useAuth() as { user: User | null };
