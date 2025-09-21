@@ -199,7 +199,7 @@ export default function ImportExpensesModal() {
       const dateIndex = headers.findIndex(h => h.toLowerCase() === mapping.dateColumn.toLowerCase());
       const descIndex = headers.findIndex(h => h.toLowerCase() === mapping.descriptionColumn.toLowerCase());
       const amountIndex = headers.findIndex(h => h.toLowerCase() === mapping.amountColumn.toLowerCase());
-      const categoryIndex = mapping.categoryColumn ? 
+      const categoryIndex = mapping.categoryColumn && mapping.categoryColumn !== "__none__" ? 
         headers.findIndex(h => h.toLowerCase() === mapping.categoryColumn.toLowerCase()) : -1;
 
       if (dateIndex === -1 || descIndex === -1 || amountIndex === -1) {
@@ -214,7 +214,7 @@ export default function ImportExpensesModal() {
       const transactions: ImportedTransaction[] = dataRows.map((row, index) => {
         let dateStr = row[dateIndex] || '';
         let amount = row[amountIndex] || '0';
-        let importedCategory = categoryIndex >= 0 ? row[categoryIndex] || '' : '';
+        let importedCategory = categoryIndex >= 0 && mapping.categoryColumn !== "__none__" ? row[categoryIndex] || '' : '';
         
         // Pulisci e converti l'importo
         amount = amount.replace(/[€$£¥,\s]/g, '').replace(',', '.');
@@ -268,20 +268,17 @@ export default function ImportExpensesModal() {
         // Cerca la categoria corrispondente se c'è una colonna categoria
         let finalCategoryId = mapping.defaultCategoryId;
         let isConfirmed = false;
-        let rawCategory = '';
+        let rawCategory = undefined; // Solo se c'è un match
         
         if (importedCategory.trim()) {
-          rawCategory = importedCategory.trim();
           const matchedCategory = findMatchingCategory(importedCategory, categories);
           if (matchedCategory) {
             finalCategoryId = matchedCategory.id;
-            // Se c'è un match, la categoria è preselezionata ma NON confermata
-            isConfirmed = false;
+            rawCategory = importedCategory.trim(); // Salva solo se c'è match
+            isConfirmed = false; // Preselezionata ma non confermata
           }
-          // Se non c'è match, usa la categoria di default e lascia confirmed = false
-        } else {
-          // Se non c'è categoria dal CSV, usa quella di default e lascia confirmed = false
-          isConfirmed = false;
+          // Se non c'è match, usa categoria di default e NON salva rawCategory
+          // Questo farà sì che lo stato sia "missing" (rosso) invece di "preselected" (giallo)
         }
 
         return {
@@ -290,7 +287,7 @@ export default function ImportExpensesModal() {
           amount: parseFloat(amount) < 0 ? amount : `-${Math.abs(parseFloat(amount))}`,
           categoryId: finalCategoryId,
           accountId: mapping.defaultAccountId,
-          importedCategoryRaw: rawCategory || undefined,
+          importedCategoryRaw: rawCategory,
           confirmed: isConfirmed
         };
       }).filter(t => t.description && !isNaN(parseFloat(t.amount)));
@@ -424,7 +421,7 @@ export default function ImportExpensesModal() {
                     <SelectValue placeholder="Seleziona colonna categoria" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Nessuna colonna categoria</SelectItem>
+                    <SelectItem value="__none__">Nessuna colonna categoria</SelectItem>
                     {csvHeaders.map((header, index) => (
                       <SelectItem key={index} value={header}>
                         {header}

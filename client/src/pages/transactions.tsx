@@ -3,6 +3,7 @@ import { queryClient } from "@/lib/queryClient";
 import type { Transaction, Category, Account } from "@shared/schema";
 import TransactionTable from "@/components/transactions/transaction-table";
 import AddTransactionModal from "@/components/transactions/add-transaction-modal";
+import ImportExpensesModal from "@/components/import/import-expenses-modal";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 
@@ -60,6 +61,26 @@ export default function Transactions() {
     }
   };
 
+  const handleConfirmCategory = async (transactionId: string, categoryId: string) => {
+    try {
+      await apiRequest("PUT", `/api/transactions/${transactionId}`, {
+        categoryId,
+        confirmed: true
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/transactions'] });
+      toast({
+        title: "Successo",
+        description: "Categoria confermata con successo",
+      });
+    } catch (error) {
+      toast({
+        title: "Errore",
+        description: "Errore nella conferma della categoria",
+        variant: "destructive",
+      });
+    }
+  };
+
   const isLoading = transactionsLoading || categoriesLoading || accountsLoading;
 
   if (isLoading) {
@@ -84,11 +105,14 @@ export default function Transactions() {
               <p className="text-sm text-slate-500">Gestisci tutte le tue transazioni</p>
             </div>
             
-            <AddTransactionModal
-              categories={categories}
-              accounts={accounts}
-              onSubmit={handleAddTransaction}
-            />
+            <div className="flex space-x-3">
+              <AddTransactionModal
+                categories={categories}
+                accounts={accounts}
+                onSubmit={handleAddTransaction}
+              />
+              <ImportExpensesModal />
+            </div>
           </div>
         </div>
       </header>
@@ -100,6 +124,7 @@ export default function Transactions() {
           accounts={accounts}
           onEdit={handleEditTransaction}
           onDelete={handleDeleteTransaction}
+          onConfirmCategory={handleConfirmCategory}
         />
       </div>
     </div>

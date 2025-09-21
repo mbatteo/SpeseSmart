@@ -5,6 +5,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { CheckCircle, AlertCircle, XCircle } from "lucide-react";
 
 interface TransactionTableProps {
   transactions: Transaction[];
@@ -12,6 +14,7 @@ interface TransactionTableProps {
   accounts: Account[];
   onEdit: (transaction: Transaction) => void;
   onDelete: (id: string) => void;
+  onConfirmCategory?: (transactionId: string, categoryId: string) => void;
 }
 
 export default function TransactionTable({ 
@@ -19,12 +22,57 @@ export default function TransactionTable({
   categories, 
   accounts, 
   onEdit, 
-  onDelete 
+  onDelete,
+  onConfirmCategory
 }: TransactionTableProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("");
   const [currentPage, setCurrentPage] = useState(1);
+  const [editingCategories, setEditingCategories] = useState<{[key: string]: string}>({});
   const itemsPerPage = 10;
+
+  // Funzione per determinare lo stato di una transazione
+  const getTransactionStatus = (transaction: Transaction) => {
+    // Se non c'è categoria importata e non è confermata → Rosso (mancante)
+    if (!transaction.importedCategoryRaw && !transaction.confirmed) {
+      return { status: 'missing', color: 'red', label: 'Categoria mancante' };
+    }
+    
+    // Se c'è categoria importata ma non confermata → Giallo (preselezionata)
+    if (transaction.importedCategoryRaw && !transaction.confirmed) {
+      return { status: 'preselected', color: 'yellow', label: 'Preselezionata da import' };
+    }
+    
+    // Se è confermata manualmente → Verde (confermata)
+    if (transaction.confirmed) {
+      return { status: 'confirmed', color: 'green', label: 'Confermata manualmente' };
+    }
+    
+    // Default: rosso
+    return { status: 'missing', color: 'red', label: 'Categoria mancante' };
+  };
+
+  // Funzione per gestire il cambio categoria
+  const handleCategoryChange = (transactionId: string, newCategoryId: string) => {
+    setEditingCategories(prev => ({
+      ...prev,
+      [transactionId]: newCategoryId
+    }));
+  };
+
+  // Funzione per confermare la categoria
+  const handleConfirmCategory = (transactionId: string, currentCategoryId: string) => {
+    const newCategoryId = editingCategories[transactionId] || currentCategoryId;
+    if (newCategoryId && onConfirmCategory) {
+      onConfirmCategory(transactionId, newCategoryId);
+      // Rimuovi dalla lista di editing
+      setEditingCategories(prev => {
+        const newState = { ...prev };
+        delete newState[transactionId];
+        return newState;
+      });
+    }
+  };
 
   const getCategoryById = (id: string) => categories.find(c => c.id === id);
   const getAccountById = (id: string) => accounts.find(a => a.id === id);
@@ -90,6 +138,7 @@ export default function TransactionTable({
               <th className="text-left py-3 px-6 text-xs font-medium text-slate-500 uppercase tracking-wider">Data</th>
               <th className="text-left py-3 px-6 text-xs font-medium text-slate-500 uppercase tracking-wider">Descrizione</th>
               <th className="text-left py-3 px-6 text-xs font-medium text-slate-500 uppercase tracking-wider">Categoria</th>
+              <th className="text-center py-3 px-6 text-xs font-medium text-slate-500 uppercase tracking-wider">Stato</th>
               <th className="text-left py-3 px-6 text-xs font-medium text-slate-500 uppercase tracking-wider">Conto</th>
               <th className="text-right py-3 px-6 text-xs font-medium text-slate-500 uppercase tracking-wider">Importo</th>
               <th className="text-center py-3 px-6 text-xs font-medium text-slate-500 uppercase tracking-wider">Azioni</th>
@@ -100,71 +149,126 @@ export default function TransactionTable({
               paginatedTransactions.map((transaction) => {
                 const category = getCategoryById(transaction.categoryId);
                 const account = getAccountById(transaction.accountId);
+                const status = getTransactionStatus(transaction);
+                const isEditing = transaction.id in editingCategories;
+                const currentCategoryId = isEditing ? editingCategories[transaction.id] : transaction.categoryId;
                 
                 return (
-                  <tr key={transaction.id} className="hover:bg-slate-50" data-testid={`transaction-row-${transaction.id}`}>
-                    <td className="py-4 px-6 text-sm text-slate-600">
-                      <div>
-                        <p className="font-medium">{formatDate(transaction.date)}</p>
-                        <p className="text-xs text-slate-500">{formatTime(transaction.date)}</p>
-                      </div>
-                    </td>
-                    <td className="py-4 px-6">
-                      <div>
-                        <p className="font-medium text-slate-900">{transaction.description}</p>
-                        <p className="text-xs text-slate-500">{account?.name}</p>
-                      </div>
-                    </td>
-                    <td className="py-4 px-6">
-                      {category && (
-                        <Badge 
-                          variant="secondary" 
-                          className="inline-flex items-center"
-                          style={{ 
-                            backgroundColor: `${category.color}20`, 
-                            color: category.color,
-                            border: `1px solid ${category.color}40`
-                          }}
-                        >
-                          <i className={`${category.icon} mr-1`} />
-                          {category.name}
-                        </Badge>
-                      )}
-                    </td>
-                    <td className="py-4 px-6 text-sm text-slate-600">
-                      {account && ACCOUNT_TYPES[account.type as keyof typeof ACCOUNT_TYPES]}
-                    </td>
-                    <td className="py-4 px-6 text-right">
-                      <span className="font-semibold text-red-600" data-testid={`amount-${transaction.id}`}>
-                        -{formatCurrency(parseFloat(transaction.amount))}
-                      </span>
-                    </td>
-                    <td className="py-4 px-6 text-center">
-                      <div className="flex items-center justify-center space-x-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => onEdit(transaction)}
-                          data-testid={`button-edit-${transaction.id}`}
-                        >
-                          <i className="fas fa-edit text-slate-400 hover:text-primary-500" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => onDelete(transaction.id)}
-                          data-testid={`button-delete-${transaction.id}`}
-                        >
-                          <i className="fas fa-trash text-slate-400 hover:text-red-500" />
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
+                  <TooltipProvider key={transaction.id}>
+                    <tr className="hover:bg-slate-50" data-testid={`transaction-row-${transaction.id}`}>
+                      <td className="py-4 px-6 text-sm text-slate-600">
+                        <div>
+                          <p className="font-medium">{formatDate(transaction.date)}</p>
+                          <p className="text-xs text-slate-500">{formatTime(transaction.date)}</p>
+                        </div>
+                      </td>
+                      <td className="py-4 px-6">
+                        <div>
+                          <p className="font-medium text-slate-900">{transaction.description}</p>
+                          <p className="text-xs text-slate-500">{account?.name}</p>
+                        </div>
+                      </td>
+                      <td className="py-4 px-6">
+                        <div className="space-y-2">
+                          {/* Dropdown categoria editabile */}
+                          <Select 
+                            value={currentCategoryId || ""} 
+                            onValueChange={(value) => handleCategoryChange(transaction.id, value)}
+                            data-testid={`select-category-${transaction.id}`}
+                          >
+                            <SelectTrigger className="w-full">
+                              <SelectValue 
+                                placeholder={status.status === 'missing' ? "Seleziona una categoria" : "Categoria"} 
+                              />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {categories.map(cat => (
+                                <SelectItem key={cat.id} value={cat.id}>
+                                  <div className="flex items-center">
+                                    <i className={`${cat.icon} mr-2`} style={{ color: cat.color }} />
+                                    {cat.name}
+                                  </div>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          
+                          {/* Badge "No preselezione" per casi rossi */}
+                          {status.status === 'missing' && !transaction.importedCategoryRaw && (
+                            <Badge variant="destructive" className="text-xs">
+                              No preselezione
+                            </Badge>
+                          )}
+                          
+                          {/* Pulsante conferma quando c'è una modifica O quando la categoria è preselezionata */}
+                          {(isEditing || status.status === 'preselected') && (
+                            <Button
+                              size="sm"
+                              onClick={() => handleConfirmCategory(transaction.id, currentCategoryId)}
+                              data-testid={`button-confirm-category-${transaction.id}`}
+                              className="w-full"
+                            >
+                              Conferma
+                            </Button>
+                          )}
+                        </div>
+                      </td>
+                      <td className="py-4 px-6 text-center">
+                        {/* Pallino colorato per lo stato */}
+                        <Tooltip>
+                          <TooltipTrigger>
+                            <div 
+                              className="w-3 h-3 rounded-full mx-auto"
+                              style={{
+                                backgroundColor: 
+                                  status.color === 'red' ? '#ef4444' :
+                                  status.color === 'yellow' ? '#f59e0b' :
+                                  '#10b981'
+                              }}
+                              aria-label={status.label}
+                              data-testid={`status-${transaction.id}`}
+                            />
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>{status.label}</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </td>
+                      <td className="py-4 px-6 text-sm text-slate-600">
+                        {account && ACCOUNT_TYPES[account.type as keyof typeof ACCOUNT_TYPES]}
+                      </td>
+                      <td className="py-4 px-6 text-right">
+                        <span className="font-semibold text-red-600" data-testid={`amount-${transaction.id}`}>
+                          -{formatCurrency(parseFloat(transaction.amount))}
+                        </span>
+                      </td>
+                      <td className="py-4 px-6 text-center">
+                        <div className="flex items-center justify-center space-x-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => onEdit(transaction)}
+                            data-testid={`button-edit-${transaction.id}`}
+                          >
+                            <i className="fas fa-edit text-slate-400 hover:text-primary-500" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => onDelete(transaction.id)}
+                            data-testid={`button-delete-${transaction.id}`}
+                          >
+                            <i className="fas fa-trash text-slate-400 hover:text-red-500" />
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  </TooltipProvider>
                 );
               })
             ) : (
               <tr>
-                <td colSpan={6} className="py-8 text-center text-slate-500">
+                <td colSpan={7} className="py-8 text-center text-slate-500">
                   <div>
                     <i className="fas fa-receipt text-2xl mb-2"></i>
                     <p>Nessuna transazione trovata</p>

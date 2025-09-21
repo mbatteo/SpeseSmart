@@ -63,7 +63,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/transactions/:id", async (req, res) => {
+  app.put("/api/transactions/:id", isAuthenticated, async (req, res) => {
     try {
       const validatedData = insertTransactionSchema.partial().parse(req.body);
       const transaction = await storage.updateTransaction(req.params.id, validatedData);
