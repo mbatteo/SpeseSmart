@@ -57,6 +57,16 @@ export class DatabaseStorage implements IStorage {
     this.initializeDefaultData();
   }
 
+  private normalizeAmount(value: number | string): string {
+    if (typeof value === 'string') {
+      const normalized = Number(value.replace(/\s/g, '').replace(',', '.'));
+      if (!Number.isFinite(normalized)) throw new Error('Invalid amount');
+      return normalized.toFixed(2);
+    }
+    if (!Number.isFinite(value)) throw new Error('Invalid amount');
+    return value.toFixed(2);
+  }
+
   private async initializeDefaultData() {
     // Check if data already exists
     const existingCategories = await db.select().from(categories).limit(1);
@@ -127,6 +137,7 @@ export class DatabaseStorage implements IStorage {
       .values({
         ...insertTransaction,
         date,
+        amount: this.normalizeAmount(insertTransaction.amount as number | string),
       })
       .returning();
     return transaction;
@@ -136,6 +147,9 @@ export class DatabaseStorage implements IStorage {
     const updateData: any = { ...update };
     if (update.date) {
       updateData.date = typeof update.date === 'string' ? new Date(update.date) : update.date;
+    }
+    if (update.amount !== undefined) {
+      updateData.amount = this.normalizeAmount(update.amount as number | string);
     }
     
     const [transaction] = await db
