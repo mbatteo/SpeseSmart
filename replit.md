@@ -18,6 +18,16 @@ Application language: Italian interface and messages.
 ✓ **Date Handling**: Improved date parsing for multiple formats (DD/MM/YYYY, YYYY-MM-DD, etc.)
 ✓ **Error Handling**: Enhanced validation and error messages for transaction creation
 
+## Recent Changes (September 21, 2025)
+
+✓ **Dual Authentication System**: Implemented comprehensive dual authentication maintaining existing Replit OAuth plus new local email/password authentication
+✓ **Local Registration**: Complete user registration with email/password, secure bcrypt hashing, and form validation
+✓ **Password Reset Flow**: Full forgot/reset password functionality with secure token generation and email delivery
+✓ **Enhanced Security**: Three-tier rate limiting system (IP, email, user-based) for authentication endpoints
+✓ **Database Schema Extension**: Added password_hash, email_verified, token_version fields to users table and password_reset_tokens table
+✓ **Italian Interface**: All new authentication pages and messages maintain Italian language consistency
+✓ **Email Configuration**: Flexible email system with SMTP support and console fallback for development
+
 ## System Architecture
 
 ### Frontend Architecture
@@ -33,7 +43,10 @@ Application language: Italian interface and messages.
 ### Backend Architecture
 - **Framework**: Express.js with TypeScript running on Node.js
 - **API Design**: RESTful API with proper HTTP status codes and error handling
-- **Data Storage**: In-memory storage implementation with interface for future database integration
+- **Data Storage**: PostgreSQL database with Drizzle ORM for type-safe database operations
+- **Authentication APIs**: Local authentication endpoints with bcrypt password hashing and secure token generation
+- **Email System**: Nodemailer integration with SMTP support and console fallback for development
+- **Rate Limiting**: Three-tier security system (IP, email, user-based) for authentication protection
 - **Schema Validation**: Zod schemas shared between frontend and backend for consistent data validation
 - **Development Setup**: Hot reload with Vite middleware integration for seamless full-stack development
 
@@ -44,17 +57,24 @@ Application language: Italian interface and messages.
   - `categories` - Expense categories with customizable colors and icons
   - `accounts` - Bank accounts, credit cards, and cash accounts with balances
   - `budgets` - Monthly/yearly budget limits per category
-  - `users` - User profiles with email, name, and authentication data
-  - `sessions` - Session storage for authentication
-- **Relationships**: Proper foreign key relationships between transactions, categories, and accounts
+  - `users` - Extended user profiles with email, name, password_hash, email_verified, token_version for dual authentication
+  - `password_reset_tokens` - Secure password reset tokens with expiration and single-use enforcement
+  - `sessions` - Session storage for authentication with PostgreSQL backend
+- **Relationships**: Proper foreign key relationships between transactions, categories, accounts, and users
+- **Security**: Bcrypt password hashing, secure token generation, and session management
 - **CSV Import**: Advanced CSV parsing with column mapping, date format detection, and transaction preview
 
 ### Authentication & Authorization
-- **Replit OAuth Integration**: Full authentication system with Replit as OpenID Connect provider
-- **Session Management**: PostgreSQL-based session storage with connect-pg-simple
+- **Dual Authentication System**: Complete authentication supporting both Replit OAuth and local email/password
+- **Replit OAuth Integration**: Existing authentication system with Replit as OpenID Connect provider
+- **Local Authentication**: Email/password registration, login, forgot/reset password with bcrypt hashing
+- **Password Security**: Secure bcrypt hashing, token-based password reset with expiration
+- **Session Management**: PostgreSQL-based session storage with connect-pg-simple for both auth methods
+- **Rate Limiting**: Three-tier protection system (IP, email, user-based) for authentication endpoints
+- **Email System**: Nodemailer integration for password reset with SMTP/console fallback
 - **Protected Routes**: All API endpoints require authentication via isAuthenticated middleware
-- **User Management**: Complete user profile system with email, name, and profile image support
-- **Landing Page**: Separate interface for unauthenticated users with login functionality
+- **User Management**: Extended user profile system supporting both OAuth and local account data
+- **Landing Page**: Updated interface with dual authentication options (Replit OAuth + local registration)
 
 ### Development & Deployment
 - **Development**: Unified development server with Vite handling frontend and Express handling API
@@ -102,3 +122,23 @@ Application language: Italian interface and messages.
 - **date-fns**: Modern JavaScript date utility library for transaction date handling
 - **cmdk**: Command menu component for advanced user interactions
 - **nanoid**: URL-safe unique string ID generator
+
+### Authentication and Security
+- **bcrypt**: Secure password hashing for local authentication
+- **nodemailer**: Email sending capability for password reset functionality
+
+## Environment Configuration
+
+### Required Environment Variables
+These are automatically provided by Replit:
+- `DATABASE_URL` - PostgreSQL database connection string
+- `PGHOST`, `PGPORT`, `PGUSER`, `PGPASSWORD`, `PGDATABASE` - PostgreSQL connection details
+
+### Optional Environment Variables
+For email functionality (password reset emails):
+- `SMTP_HOST` - SMTP server hostname (e.g., smtp.gmail.com)
+- `SMTP_PORT` - SMTP server port (default: 587)
+- `SMTP_USER` - SMTP username/email address
+- `SMTP_PASS` - SMTP password or app-specific password
+
+**Note**: If SMTP variables are not configured, the system will fall back to console logging for development/testing purposes. Password reset links will be displayed in the server console instead of being sent via email.
