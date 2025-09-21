@@ -1,6 +1,6 @@
 // Importo le funzioni necessarie per creare il database schema
 import { sql } from "drizzle-orm"; // Per funzioni SQL native
-import { pgTable, text, varchar, decimal, timestamp, uuid, index, jsonb } from "drizzle-orm/pg-core"; // Tipi di colonne PostgreSQL
+import { pgTable, text, varchar, decimal, timestamp, uuid, index, jsonb, boolean } from "drizzle-orm/pg-core"; // Tipi di colonne PostgreSQL
 import { createInsertSchema } from "drizzle-zod"; // Crea schema di validazione automatici
 import { z } from "zod"; // Libreria per validare i dati in ingresso
 
@@ -8,6 +8,7 @@ import { z } from "zod"; // Libreria per validare i dati in ingresso
 export const categories = pgTable("categories", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`), // ID unico generato automaticamente
   name: text("name").notNull(), // Nome della categoria (es: "Alimentari")
+  localizedName: text("localized_name"), // Nome localizzato per matching fallback (es: "Groceries" per "Alimentari")
   color: text("color").notNull().default('#6B7280'), // Colore per visualizzare la categoria
   icon: text("icon").notNull().default('fas fa-tag'), // Icona della categoria
 });
@@ -28,6 +29,8 @@ export const transactions = pgTable("transactions", {
   date: timestamp("date").notNull(), // Data e ora della transazione
   categoryId: varchar("category_id").references(() => categories.id).notNull(), // Collegamento alla categoria
   accountId: varchar("account_id").references(() => accounts.id).notNull(), // Collegamento al conto utilizzato
+  importedCategoryRaw: text("imported_category_raw"), // Categoria originale dal CSV per il matching
+  confirmed: boolean("confirmed").default(false), // Se la categoria è stata confermata manualmente dall'utente
   createdAt: timestamp("created_at").default(sql`now()`), // Quando è stata creata nel sistema
 });
 
