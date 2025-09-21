@@ -113,11 +113,11 @@ export default function Landing() {
               </p>
               <Button 
                 size="lg" 
-                className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3"
-                onClick={() => window.location.href = '/api/login'}
-                data-testid="button-login-cta"
+                className="bg-green-600 hover:bg-green-700 text-white px-8 py-3"
+                onClick={() => window.location.href = '/register'}
+                data-testid="button-register-cta"
               >
-                Accedi con Replit
+                Registrati Ora
               </Button>
             </CardContent>
           </Card>
