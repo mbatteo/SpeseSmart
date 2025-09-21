@@ -1,0 +1,52 @@
+Obiettivo: Estendere l’upload/import CSV e la pagina Transazioni per mappare la colonna categoria dal CSV e gestire lo stato visivo per conferma manuale con tre stati: rosso, giallo, verde, il tutto usando solo l’interfaccia e i meccanismi già esistenti (nessuna nuova API, nessun audit log).
+Contesto esistente:
+L’upload CSV e la tabella Transazioni esistono già.
+Esiste un elenco di categorie dell’app con proprietà almeno “name”; creare un nuovo campo opzionale “localizedName” per la comparazione di fallback.
+Regole di matching categorie:
+Nessun fuzzy matching.
+Match esatto se e solo se: trim spazi iniziali/finali + confronto case-insensitive tra imported_category_raw e categorie esistenti sul campo “name”; in caso di mismatch su “name”, tentare il fallback su nuovo campo “localizedName” con le stesse regole (trim + case-insensitive).
+Se nessuno dei due campi matcha, non impostare alcuna preselezione.
+Definizioni operative:
+“Preselezionata”: la dropdown categoria della riga mostra il valore derivato dal match ma la riga resta da confermare manualmente.
+Stati riga:
+Rosso: categoria mancante (nessuna preselezione, nessuna selezione manuale) → stato “bloccato”.
+Giallo: categoria preselezionata da import (match esatto su name o localizedName) ma non ancora confermata manualmente.
+Verde: categoria confermata manualmente dall’utente.
+Requisiti UI e comportamento:
+Upload (flow esistente)
+Aggiungere selettore per indicare quale colonna del CSV contiene la categoria.
+Pagina Transazioni (vista esistente, modificata)
+Aggiungere colonne:
+“Categoria” come dropdown editabile sempre:
+Se match esatto su name o fallback localizedName → dropdown preselezionata ma non confermata (stato giallo).
+Se nessun match → dropdown vuota con placeholder “nessuna categoria selezionata” (stato rosso).
+“Stato” con pallino colorato:
+Rosso = mancante; Giallo = preselezionata da import; Verde = confermata manualmente.
+Badge “No preselezione” per i casi rossi, per evidenza visiva.
+La dropdown è ricercabile, tastiera‑navigabile e mostra tutte le categorie esistenti.
+Azioni utente (solo logica UI, riuso salvataggio esistente)
+Per riga: selezione/accettazione della categoria + click “Conferma” → persistere usando i meccanismi già presenti (nessuna nuova API).
+Opzione bulk “Conferma selezionate” se la tabella supporta selezione multipla.
+Stato e preselezioni persistono dopo refresh.
+Accessibilità/UX
+Pallini con tooltip e aria-label coerenti con lo stato; rispettare best practice di tooltip accessibili (aria-label/aria-describedby, focus/hover, contrasto).
+Toast/snackbar su conferma/errore.
+Vincoli:
+Nessun fuzzy matching; solo match esatto (trim + case-insensitive) su name, con fallback su localizedName.
+Nessun log/audit.
+Nessuna nuova API; eventuale micro‑change backend solo se necessario per persistere “confirmed=true/false”, documentandolo.
+Acceptance criteria:
+In upload, scelta colonna categoria 
+In Transazioni:
+Se imported_category_raw matcha” “name” o “localizedName” → dropdown preselezionata, stato giallo, richiede conferma manuale.
+Se non matcha → dropdown vuota con placeholder “seleziona una categoria”, stato rosso e badge “No preselezione”.
+Dopo click “Conferma” su riga, stato diventa verde; persiste al refresh.
+Nessun audit log creato.
+Istruzioni operative per l’Agent:
+Implementa il selettore colonna categoria in upload
+In Transazioni, aggiungi:
+Colonne “Categoria” (dropdown), “Stato” (pallino), badge “No preselezione”.
+Logica di matching esatto su name con fallback localizedName; nessun fuzzy.
+Persistenza “confirmed” riusando le chiamate esistenti; se serve flag booleano aggiuntivo lato backend, limita il change e documenta.
+Accessibilità: tooltip con aria-describedby e ruoli appropriati, etichette tastiera, contrasti adeguati.
+Fornisci nella PR: modifiche frontend, eventuale nota backend minima,
