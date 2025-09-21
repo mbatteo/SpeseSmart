@@ -9,19 +9,34 @@ import {
   type InsertBudget,
   type User,
   type UpsertUser,
+  type PasswordResetToken,
+  type InsertPasswordResetToken,
   users,
   transactions,
   categories,
   accounts,
-  budgets
+  budgets,
+  passwordResetTokens
 } from "@shared/schema";
 import { db } from "./db";
-import { eq } from "drizzle-orm";
+import { eq, and, gt, lt } from "drizzle-orm";
 
 export interface IStorage {
   // User operations (required for Replit Auth)
   getUser(id: string): Promise<User | undefined>;
   upsertUser(user: UpsertUser): Promise<User>;
+  
+  // Local authentication operations
+  getUserByEmail(email: string): Promise<User | undefined>;
+  createLocalUser(userData: { email: string; passwordHash: string; firstName: string; lastName: string }): Promise<User>;
+  updateUserPassword(userId: string, passwordHash: string): Promise<void>;
+  incrementUserTokenVersion(userId: string): Promise<void>;
+  
+  // Password reset token operations
+  createPasswordResetToken(tokenData: InsertPasswordResetToken): Promise<PasswordResetToken>;
+  getValidPasswordResetToken(userId: string, tokenHash: string): Promise<PasswordResetToken | undefined>;
+  markPasswordResetTokenAsUsed(tokenId: string): Promise<void>;
+  cleanupExpiredPasswordResetTokens(): Promise<void>;
   
   // Transactions
   getTransactions(): Promise<Transaction[]>;
@@ -115,6 +130,85 @@ export class DatabaseStorage implements IStorage {
       })
       .returning();
     return user;
+  }
+
+  // Local authentication operations
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.email, email));
+    return user;
+  }
+
+  async createLocalUser(userData: { email: string; passwordHash: string; firstName: string; lastName: string }): Promise<User> {
+    const [user] = await db
+      .insert(users)
+      .values({
+        ...userData,
+        emailVerified: false,
+        tokenVersion: '0',
+      })
+      .returning();
+    return user;
+  }
+
+  async updateUserPassword(userId: string, passwordHash: string): Promise<void> {
+    await db
+      .update(users)
+      .set({
+        passwordHash,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, userId));
+  }
+
+  async incrementUserTokenVersion(userId: string): Promise<void> {
+    const user = await this.getUser(userId);
+    if (user) {
+      const newVersion = (parseInt(user.tokenVersion || '0') + 1).toString();
+      await db
+        .update(users)
+        .set({
+          tokenVersion: newVersion,
+          updatedAt: new Date(),
+        })
+        .where(eq(users.id, userId));
+    }
+  }
+
+  // Password reset token operations
+  async createPasswordResetToken(tokenData: InsertPasswordResetToken): Promise<PasswordResetToken> {
+    const [token] = await db
+      .insert(passwordResetTokens)
+      .values(tokenData)
+      .returning();
+    return token;
+  }
+
+  async getValidPasswordResetToken(userId: string, tokenHash: string): Promise<PasswordResetToken | undefined> {
+    const [token] = await db
+      .select()
+      .from(passwordResetTokens)
+      .where(
+        and(
+          eq(passwordResetTokens.userId, userId),
+          eq(passwordResetTokens.tokenHash, tokenHash),
+          eq(passwordResetTokens.used, false),
+          gt(passwordResetTokens.expiresAt, new Date())
+        )
+      );
+    return token;
+  }
+
+  async markPasswordResetTokenAsUsed(tokenId: string): Promise<void> {
+    await db
+      .update(passwordResetTokens)
+      .set({ used: true })
+      .where(eq(passwordResetTokens.id, tokenId));
+  }
+
+  async cleanupExpiredPasswordResetTokens(): Promise<void> {
+    await db
+      .delete(passwordResetTokens)
+      .where(lt(passwordResetTokens.expiresAt, new Date()));
   }
 
   // Transactions

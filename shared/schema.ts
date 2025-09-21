@@ -62,9 +62,27 @@ export const users = pgTable("users", {
   firstName: varchar("first_name"), // Nome dell'utente
   lastName: varchar("last_name"), // Cognome dell'utente
   profileImageUrl: varchar("profile_image_url"), // URL dell'immagine profilo dell'utente
+  passwordHash: varchar("password_hash"), // Hash bcrypt della password (null per utenti OAuth)
+  emailVerified: boolean("email_verified").default(false), // Se l'email è stata verificata
+  tokenVersion: text("token_version").default('0'), // Versione token per invalidare sessioni
+  lastLogin: timestamp("last_login"), // Ultimo accesso dell'utente
   createdAt: timestamp("created_at").defaultNow(), // Quando è stato creato l'account
   updatedAt: timestamp("updated_at").defaultNow(), // Ultimo aggiornamento dei dati utente
 });
+
+// Tabella per i token di reset password
+export const passwordResetTokens = pgTable("password_reset_tokens", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`), // ID token unico
+  userId: varchar("user_id").references(() => users.id).notNull(), // Collegamento all'utente
+  tokenHash: text("token_hash").notNull(), // Hash SHA-256 del token sicuro
+  expiresAt: timestamp("expires_at").notNull(), // Scadenza del token (default 1 ora)
+  used: boolean("used").default(false), // Se il token è già stato utilizzato
+  requestIp: varchar("request_ip"), // IP della richiesta per logging sicurezza
+  createdAt: timestamp("created_at").defaultNow(), // Quando è stato creato
+}, (table) => [
+  index("IDX_password_reset_user").on(table.userId), // Indice per velocizzare ricerche per utente
+  index("IDX_password_reset_expires").on(table.expiresAt), // Indice per cleanup token scaduti
+]);
 
 // SCHEMA DI VALIDAZIONE Zod per i dati in ingresso (rimuovono campi auto-generati)
 
@@ -99,6 +117,46 @@ export const insertBudgetSchema = createInsertSchema(budgets).omit({
   id: true, // L'ID viene generato automaticamente
 });
 
+// Schemi per l'autenticazione locale
+export const insertPasswordResetTokenSchema = createInsertSchema(passwordResetTokens).omit({
+  id: true, // L'ID viene generato automaticamente
+  createdAt: true, // La data viene impostata automaticamente
+});
+
+// Schema per registrazione utente locale
+export const localUserRegistrationSchema = z.object({
+  email: z.string().email("Email non valida"),
+  password: z.string().min(8, "La password deve essere di almeno 8 caratteri"),
+  passwordConfirm: z.string(),
+  firstName: z.string().min(1, "Nome richiesto"),
+  lastName: z.string().min(1, "Cognome richiesto"),
+}).refine((data) => data.password === data.passwordConfirm, {
+  message: "Le password non coincidono",
+  path: ["passwordConfirm"],
+});
+
+// Schema per login utente locale
+export const localUserLoginSchema = z.object({
+  email: z.string().email("Email non valida"),
+  password: z.string().min(1, "Password richiesta"),
+});
+
+// Schema per richiesta reset password
+export const forgotPasswordSchema = z.object({
+  email: z.string().email("Email non valida"),
+});
+
+// Schema per reset password
+export const resetPasswordSchema = z.object({
+  token: z.string().min(1, "Token richiesto"),
+  email: z.string().email("Email non valida"),
+  password: z.string().min(8, "La password deve essere di almeno 8 caratteri"),
+  passwordConfirm: z.string(),
+}).refine((data) => data.password === data.passwordConfirm, {
+  message: "Le password non coincidono", 
+  path: ["passwordConfirm"],
+});
+
 // TIPI TypeScript finali per utilizzare i dati nell'applicazione
 
 // Tipi per inserire nuovi dati (senza ID auto-generati)
@@ -106,12 +164,20 @@ export type InsertCategory = z.infer<typeof insertCategorySchema>; // Tipo per i
 export type InsertAccount = z.infer<typeof insertAccountSchema>; // Tipo per inserire conto
 export type InsertTransaction = z.infer<typeof insertTransactionSchema>; // Tipo per inserire transazione
 export type InsertBudget = z.infer<typeof insertBudgetSchema>; // Tipo per inserire budget
+export type InsertPasswordResetToken = z.infer<typeof insertPasswordResetTokenSchema>; // Tipo per token reset password
+
+// Tipi per l'autenticazione locale
+export type LocalUserRegistration = z.infer<typeof localUserRegistrationSchema>; // Tipo per registrazione
+export type LocalUserLogin = z.infer<typeof localUserLoginSchema>; // Tipo per login
+export type ForgotPassword = z.infer<typeof forgotPasswordSchema>; // Tipo per richiesta reset
+export type ResetPassword = z.infer<typeof resetPasswordSchema>; // Tipo per reset password
 
 // Tipi per leggere dati dal database (con tutti i campi inclusi ID)
 export type Category = typeof categories.$inferSelect; // Tipo per categoria dal database
 export type Account = typeof accounts.$inferSelect; // Tipo per conto dal database
 export type Transaction = typeof transactions.$inferSelect; // Tipo per transazione dal database
 export type Budget = typeof budgets.$inferSelect; // Tipo per budget dal database
+export type PasswordResetToken = typeof passwordResetTokens.$inferSelect; // Tipo per token reset password
 
 // Tipi speciali per l'autenticazione utente
 export type UpsertUser = typeof users.$inferInsert; // Tipo per creare/aggiornare utente
