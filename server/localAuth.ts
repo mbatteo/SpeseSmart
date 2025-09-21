@@ -152,20 +152,22 @@ export function setupLocalAuth(app: Express) {
         });
       }
 
-      // Imposta sessione utente (simula i dati Replit OAuth per compatibilità)
-      (req as any).user = {
+      // Imposta sessione utente usando Passport (compatibile con isAuthenticated middleware)
+      const userObject = {
         claims: {
           sub: user.id,
           email: user.email,
           first_name: user.firstName,
           last_name: user.lastName,
           profile_image_url: user.profileImageUrl,
-        }
+        },
+        // Aggiungi expires_at per compatibilità con il middleware esistente (1 anno da ora)
+        expires_at: Math.floor(Date.now() / 1000) + (365 * 24 * 60 * 60),
       };
 
-      // Salva sessione
+      // Usa req.login di Passport per impostare correttamente la sessione
       await new Promise<void>((resolve, reject) => {
-        req.session.save((err) => {
+        req.login(userObject, (err) => {
           if (err) reject(err);
           else resolve();
         });

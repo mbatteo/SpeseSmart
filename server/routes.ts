@@ -34,7 +34,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/transactions/:id", async (req, res) => {
+  app.get("/api/transactions/:id", isAuthenticated, async (req, res) => {
     try {
       const transaction = await storage.getTransactionById(req.params.id);
       if (!transaction) {
