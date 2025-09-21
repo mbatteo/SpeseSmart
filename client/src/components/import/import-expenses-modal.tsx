@@ -17,6 +17,8 @@ interface ImportedTransaction {
   amount: string;
   categoryId: string;
   accountId: string;
+  importedCategoryRaw?: string; // Categoria originale dal CSV
+  confirmed?: boolean; // Se è stata confermata manualmente
 }
 
 export default function ImportExpensesModal() {
@@ -28,6 +30,7 @@ export default function ImportExpensesModal() {
     dateColumn: '',
     descriptionColumn: '',
     amountColumn: '',
+    categoryColumn: '', // Colonna del CSV che contiene la categoria (opzionale)
     defaultCategoryId: '',
     defaultAccountId: ''
   });
@@ -52,7 +55,9 @@ export default function ImportExpensesModal() {
           },
           body: JSON.stringify({
             ...transaction,
-            amount: parseFloat(transaction.amount)
+            amount: parseFloat(transaction.amount),
+            importedCategoryRaw: transaction.importedCategoryRaw || null,
+            confirmed: transaction.confirmed || false
           })
         }).then(res => {
           if (!res.ok) throw new Error('Errore nell\'importazione');
@@ -88,6 +93,7 @@ export default function ImportExpensesModal() {
       dateColumn: '',
       descriptionColumn: '',
       amountColumn: '',
+      categoryColumn: '',
       defaultCategoryId: '',
       defaultAccountId: ''
     });
@@ -151,6 +157,25 @@ export default function ImportExpensesModal() {
     }
   };
 
+  // Funzione per trovare la categoria che corrisponde al testo (matching esatto)
+  const findMatchingCategory = (categoryText: string, categories: Category[]) => {
+    if (!categoryText || !categoryText.trim()) return null;
+    
+    const normalizedText = categoryText.trim().toLowerCase();
+    
+    // Prima prova il matching sul campo 'name'
+    let match = categories.find(cat => cat.name.toLowerCase() === normalizedText);
+    
+    // Se non trova match su 'name', prova fallback su 'localizedName'
+    if (!match) {
+      match = categories.find(cat => 
+        cat.localizedName && cat.localizedName.toLowerCase() === normalizedText
+      );
+    }
+    
+    return match || null;
+  };
+
   const generatePreview = async () => {
     if (!file) return;
     
@@ -174,6 +199,8 @@ export default function ImportExpensesModal() {
       const dateIndex = headers.findIndex(h => h.toLowerCase() === mapping.dateColumn.toLowerCase());
       const descIndex = headers.findIndex(h => h.toLowerCase() === mapping.descriptionColumn.toLowerCase());
       const amountIndex = headers.findIndex(h => h.toLowerCase() === mapping.amountColumn.toLowerCase());
+      const categoryIndex = mapping.categoryColumn ? 
+        headers.findIndex(h => h.toLowerCase() === mapping.categoryColumn.toLowerCase()) : -1;
 
       if (dateIndex === -1 || descIndex === -1 || amountIndex === -1) {
         toast({
@@ -187,6 +214,7 @@ export default function ImportExpensesModal() {
       const transactions: ImportedTransaction[] = dataRows.map((row, index) => {
         let dateStr = row[dateIndex] || '';
         let amount = row[amountIndex] || '0';
+        let importedCategory = categoryIndex >= 0 ? row[categoryIndex] || '' : '';
         
         // Pulisci e converti l'importo
         amount = amount.replace(/[€$£¥,\s]/g, '').replace(',', '.');
@@ -237,12 +265,33 @@ export default function ImportExpensesModal() {
           isoDate = new Date().toISOString().split('T')[0];
         }
 
+        // Cerca la categoria corrispondente se c'è una colonna categoria
+        let finalCategoryId = mapping.defaultCategoryId;
+        let isConfirmed = false;
+        let rawCategory = '';
+        
+        if (importedCategory.trim()) {
+          rawCategory = importedCategory.trim();
+          const matchedCategory = findMatchingCategory(importedCategory, categories);
+          if (matchedCategory) {
+            finalCategoryId = matchedCategory.id;
+            // Se c'è un match, la categoria è preselezionata ma NON confermata
+            isConfirmed = false;
+          }
+          // Se non c'è match, usa la categoria di default e lascia confirmed = false
+        } else {
+          // Se non c'è categoria dal CSV, usa quella di default e lascia confirmed = false
+          isConfirmed = false;
+        }
+
         return {
           date: isoDate,
           description: row[descIndex] || `Transazione ${index + 1}`,
           amount: parseFloat(amount) < 0 ? amount : `-${Math.abs(parseFloat(amount))}`,
-          categoryId: mapping.defaultCategoryId,
-          accountId: mapping.defaultAccountId
+          categoryId: finalCategoryId,
+          accountId: mapping.defaultAccountId,
+          importedCategoryRaw: rawCategory || undefined,
+          confirmed: isConfirmed
         };
       }).filter(t => t.description && !isNaN(parseFloat(t.amount)));
 
@@ -359,6 +408,23 @@ export default function ImportExpensesModal() {
                     <SelectValue placeholder="Seleziona colonna importo" />
                   </SelectTrigger>
                   <SelectContent>
+                    {csvHeaders.map((header, index) => (
+                      <SelectItem key={index} value={header}>
+                        {header}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label htmlFor="category-column">Colonna Categoria (Opzionale)</Label>
+                <Select value={mapping.categoryColumn} onValueChange={(value) => setMapping({...mapping, categoryColumn: value})}>
+                  <SelectTrigger data-testid="select-category-column">
+                    <SelectValue placeholder="Seleziona colonna categoria" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">Nessuna colonna categoria</SelectItem>
                     {csvHeaders.map((header, index) => (
                       <SelectItem key={index} value={header}>
                         {header}
