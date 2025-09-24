@@ -25,18 +25,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Transaction routes
-  app.get("/api/transactions", isAuthenticated, async (req, res) => {
+  app.get("/api/transactions", isAuthenticated, async (req: any, res) => {
     try {
-      const transactions = await storage.getTransactions();
+      const userId = req.user.claims.sub;
+      const transactions = await storage.getTransactions(userId);
       res.json(transactions);
     } catch (error) {
       res.status(500).json({ message: "Errore nel recupero delle transazioni" });
     }
   });
 
-  app.get("/api/transactions/:id", isAuthenticated, async (req, res) => {
+  app.get("/api/transactions/:id", isAuthenticated, async (req: any, res) => {
     try {
-      const transaction = await storage.getTransactionById(req.params.id);
+      const userId = req.user.claims.sub;
+      const transaction = await storage.getTransactionById(userId, req.params.id);
       if (!transaction) {
         return res.status(404).json({ message: "Transazione non trovata" });
       }
@@ -46,14 +48,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/transactions", isAuthenticated, async (req, res) => {
+  app.post("/api/transactions", isAuthenticated, async (req: any, res) => {
     try {
       console.log("Received transaction data:", req.body);
       
+      const userId = req.user.claims.sub;
       const validatedData = insertTransactionSchema.parse(req.body);
       console.log("Validated data:", validatedData);
       
-      const transaction = await storage.createTransaction(validatedData);
+      const transaction = await storage.createTransaction(userId, validatedData);
       res.status(201).json(transaction);
     } catch (error: any) {
       console.error("Transaction validation error:", error);
@@ -67,10 +70,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/transactions/:id", isAuthenticated, async (req, res) => {
+  app.put("/api/transactions/:id", isAuthenticated, async (req: any, res) => {
     try {
+      const userId = req.user.claims.sub;
       const validatedData = insertTransactionSchema.partial().parse(req.body);
-      const transaction = await storage.updateTransaction(req.params.id, validatedData);
+      const transaction = await storage.updateTransaction(userId, req.params.id, validatedData);
       if (!transaction) {
         return res.status(404).json({ message: "Transazione non trovata" });
       }
@@ -80,9 +84,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/transactions/:id", async (req, res) => {
+  app.delete("/api/transactions/:id", isAuthenticated, async (req: any, res) => {
     try {
-      const deleted = await storage.deleteTransaction(req.params.id);
+      const userId = req.user.claims.sub;
+      const deleted = await storage.deleteTransaction(userId, req.params.id);
       if (!deleted) {
         return res.status(404).json({ message: "Transazione non trovata" });
       }
@@ -93,29 +98,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Category routes
-  app.get("/api/categories", isAuthenticated, async (req, res) => {
+  app.get("/api/categories", isAuthenticated, async (req: any, res) => {
     try {
-      const categories = await storage.getCategories();
+      const userId = req.user.claims.sub;
+      const categories = await storage.getCategories(userId);
       res.json(categories);
     } catch (error) {
       res.status(500).json({ message: "Errore nel recupero delle categorie" });
     }
   });
 
-  app.post("/api/categories", async (req, res) => {
+  app.post("/api/categories", isAuthenticated, async (req: any, res) => {
     try {
+      const userId = req.user.claims.sub;
       const validatedData = insertCategorySchema.parse(req.body);
-      const category = await storage.createCategory(validatedData);
+      const category = await storage.createCategory(userId, validatedData);
       res.status(201).json(category);
     } catch (error) {
       res.status(400).json({ message: "Dati categoria non validi" });
     }
   });
 
-  app.put("/api/categories/:id", async (req, res) => {
+  app.put("/api/categories/:id", isAuthenticated, async (req: any, res) => {
     try {
+      const userId = req.user.claims.sub;
       const validatedData = insertCategorySchema.partial().parse(req.body);
-      const category = await storage.updateCategory(req.params.id, validatedData);
+      const category = await storage.updateCategory(userId, req.params.id, validatedData);
       if (!category) {
         return res.status(404).json({ message: "Categoria non trovata" });
       }
@@ -125,9 +133,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/categories/:id", async (req, res) => {
+  app.delete("/api/categories/:id", isAuthenticated, async (req: any, res) => {
     try {
-      const deleted = await storage.deleteCategory(req.params.id);
+      const userId = req.user.claims.sub;
+      const deleted = await storage.deleteCategory(userId, req.params.id);
       if (!deleted) {
         return res.status(404).json({ message: "Categoria non trovata" });
       }
@@ -138,29 +147,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Account routes
-  app.get("/api/accounts", isAuthenticated, async (req, res) => {
+  app.get("/api/accounts", isAuthenticated, async (req: any, res) => {
     try {
-      const accounts = await storage.getAccounts();
+      const userId = req.user.claims.sub;
+      const accounts = await storage.getAccounts(userId);
       res.json(accounts);
     } catch (error) {
       res.status(500).json({ message: "Errore nel recupero dei conti" });
     }
   });
 
-  app.post("/api/accounts", async (req, res) => {
+  app.post("/api/accounts", isAuthenticated, async (req: any, res) => {
     try {
+      const userId = req.user.claims.sub;
       const validatedData = insertAccountSchema.parse(req.body);
-      const account = await storage.createAccount(validatedData);
+      const account = await storage.createAccount(userId, validatedData);
       res.status(201).json(account);
     } catch (error) {
       res.status(400).json({ message: "Dati conto non validi" });
     }
   });
 
-  app.put("/api/accounts/:id", async (req, res) => {
+  app.put("/api/accounts/:id", isAuthenticated, async (req: any, res) => {
     try {
+      const userId = req.user.claims.sub;
       const validatedData = insertAccountSchema.partial().parse(req.body);
-      const account = await storage.updateAccount(req.params.id, validatedData);
+      const account = await storage.updateAccount(userId, req.params.id, validatedData);
       if (!account) {
         return res.status(404).json({ message: "Conto non trovato" });
       }
@@ -170,9 +182,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/accounts/:id", async (req, res) => {
+  app.delete("/api/accounts/:id", isAuthenticated, async (req: any, res) => {
     try {
-      const deleted = await storage.deleteAccount(req.params.id);
+      const userId = req.user.claims.sub;
+      const deleted = await storage.deleteAccount(userId, req.params.id);
       if (!deleted) {
         return res.status(404).json({ message: "Conto non trovato" });
       }
@@ -183,29 +196,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Budget routes
-  app.get("/api/budgets", async (req, res) => {
+  app.get("/api/budgets", isAuthenticated, async (req: any, res) => {
     try {
-      const budgets = await storage.getBudgets();
+      const userId = req.user.claims.sub;
+      const budgets = await storage.getBudgets(userId);
       res.json(budgets);
     } catch (error) {
       res.status(500).json({ message: "Errore nel recupero dei budget" });
     }
   });
 
-  app.post("/api/budgets", async (req, res) => {
+  app.post("/api/budgets", isAuthenticated, async (req: any, res) => {
     try {
+      const userId = req.user.claims.sub;
       const validatedData = insertBudgetSchema.parse(req.body);
-      const budget = await storage.createBudget(validatedData);
+      const budget = await storage.createBudget(userId, validatedData);
       res.status(201).json(budget);
     } catch (error) {
       res.status(400).json({ message: "Dati budget non validi" });
     }
   });
 
-  app.put("/api/budgets/:id", async (req, res) => {
+  app.put("/api/budgets/:id", isAuthenticated, async (req: any, res) => {
     try {
+      const userId = req.user.claims.sub;
       const validatedData = insertBudgetSchema.partial().parse(req.body);
-      const budget = await storage.updateBudget(req.params.id, validatedData);
+      const budget = await storage.updateBudget(userId, req.params.id, validatedData);
       if (!budget) {
         return res.status(404).json({ message: "Budget non trovato" });
       }
@@ -215,9 +231,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/budgets/:id", async (req, res) => {
+  app.delete("/api/budgets/:id", isAuthenticated, async (req: any, res) => {
     try {
-      const deleted = await storage.deleteBudget(req.params.id);
+      const userId = req.user.claims.sub;
+      const deleted = await storage.deleteBudget(userId, req.params.id);
       if (!deleted) {
         return res.status(404).json({ message: "Budget non trovato" });
       }
@@ -228,12 +245,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Route per ottenere statistiche mensili della dashboard con dati dinamici
-  app.get("/api/analytics/monthly-summary", isAuthenticated, async (req, res) => {
+  app.get("/api/analytics/monthly-summary", isAuthenticated, async (req: any, res) => {
     try {
-      // Recupero tutti i dati necessari dal database
-      const transactions = await storage.getTransactions();
-      const categories = await storage.getCategories();
-      const accounts = await storage.getAccounts();
+      // Recupero tutti i dati necessari dal database per l'utente
+      const userId = req.user.claims.sub;
+      const transactions = await storage.getTransactions(userId);
+      const categories = await storage.getCategories(userId);
+      const accounts = await storage.getAccounts(userId);
       
       // Calcolo le date per questo mese e il mese scorso
       const now = new Date();
