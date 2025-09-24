@@ -80,7 +80,14 @@ export async function setupAuth(app: Express) {
   ) => {
     const user = {};
     updateUserSession(user, tokens);
-    await upsertUser(tokens.claims());
+    const claims = tokens.claims();
+    await upsertUser(claims);
+    
+    // Inizializza i dati predefiniti per l'utente (solo se è nuovo)
+    if (claims?.sub) {
+      await storage.initializeUserData(claims.sub);
+    }
+    
     verified(null, user);
   };
 

@@ -97,6 +97,9 @@ export function setupLocalAuth(app: Express) {
         lastName,
       });
 
+      // Inizializza i dati predefiniti per il nuovo utente
+      await storage.initializeUserData(user.id);
+
       // Log evento di sicurezza
       console.log(`[SECURITY] User registered: ${user.id} (${email}) from IP: ${clientIp}`);
 
