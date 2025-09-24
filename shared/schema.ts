@@ -7,23 +7,32 @@ import { z } from "zod"; // Libreria per validare i dati in ingresso
 // Tabella per le categorie delle spese (alimentari, trasporti, ecc.)
 export const categories = pgTable("categories", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`), // ID unico generato automaticamente
+  userId: varchar("user_id").references(() => users.id, { onDelete: 'cascade' }).notNull(), // Proprietario della categoria
   name: text("name").notNull(), // Nome della categoria (es: "Alimentari")
   localizedName: text("localized_name"), // Nome localizzato per matching fallback (es: "Groceries" per "Alimentari")
   color: text("color").notNull().default('#6B7280'), // Colore per visualizzare la categoria
   icon: text("icon").notNull().default('fas fa-tag'), // Icona della categoria
-});
+}, (table) => [
+  index("IDX_categories_user").on(table.userId), // Indice per query per utente
+  index("IDX_categories_user_name").on(table.userId, table.name), // Indice composto per ricerche
+]);
 
 // Tabella per i conti bancari, carte di credito, contanti
 export const accounts = pgTable("accounts", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`), // ID unico
+  userId: varchar("user_id").references(() => users.id, { onDelete: 'cascade' }).notNull(), // Proprietario del conto
   name: text("name").notNull(), // Nome del conto (es: "Carta Intesa", "Contanti")
   type: text("type").notNull(), // Tipo: 'checking' (conto corrente), 'credit' (carta credito), 'debit' (carta debito), 'cash' (contanti)
   balance: decimal("balance", { precision: 10, scale: 2 }).notNull().default('0'), // Saldo del conto (precisione 10 cifre, 2 decimali)
-});
+}, (table) => [
+  index("IDX_accounts_user").on(table.userId), // Indice per query per utente
+  index("IDX_accounts_user_name").on(table.userId, table.name), // Indice composto per ricerche
+]);
 
 // Tabella principale per tutte le transazioni (spese e entrate)
 export const transactions = pgTable("transactions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`), // ID unico della transazione
+  userId: varchar("user_id").references(() => users.id, { onDelete: 'cascade' }).notNull(), // Proprietario della transazione
   amount: decimal("amount", { precision: 10, scale: 2 }).notNull(), // Importo (negativo per spese, positivo per entrate)
   description: text("description").notNull(), // Descrizione della transazione (es: "Spesa supermercato")
   date: timestamp("date").notNull(), // Data e ora della transazione
@@ -32,17 +41,25 @@ export const transactions = pgTable("transactions", {
   importedCategoryRaw: text("imported_category_raw"), // Categoria originale dal CSV per il matching
   confirmed: boolean("confirmed").default(false), // Se la categoria è stata confermata manualmente dall'utente
   createdAt: timestamp("created_at").default(sql`now()`), // Quando è stata creata nel sistema
-});
+}, (table) => [
+  index("IDX_transactions_user").on(table.userId), // Indice per query per utente
+  index("IDX_transactions_user_date").on(table.userId, table.date), // Indice per ordinamento per data
+  index("IDX_transactions_user_category").on(table.userId, table.categoryId), // Indice per filtrare per categoria
+]);
 
 // Tabella per i budget/limiti di spesa per categoria
 export const budgets = pgTable("budgets", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`), // ID unico
+  userId: varchar("user_id").references(() => users.id, { onDelete: 'cascade' }).notNull(), // Proprietario del budget
   categoryId: varchar("category_id").references(() => categories.id).notNull(), // Categoria del budget
   amount: decimal("amount", { precision: 10, scale: 2 }).notNull(), // Limite di spesa
   period: text("period").notNull().default('monthly'), // Periodo: 'monthly' (mensile) o 'yearly' (annuale)
   year: text("year").notNull(), // Anno del budget (es: "2025")
   month: text("month"), // Mese del budget (es: "01" per gennaio), null per budget annuali
-});
+}, (table) => [
+  index("IDX_budgets_user").on(table.userId), // Indice per query per utente
+  index("IDX_budgets_user_period").on(table.userId, table.period, table.year, table.month), // Indice per ricerche per periodo
+]);
 
 // Tabella per memorizzare le sessioni utente (necessaria per l'autenticazione)
 export const sessions = pgTable(
@@ -89,16 +106,19 @@ export const passwordResetTokens = pgTable("password_reset_tokens", {
 // Schema per validare l'inserimento di una nuova categoria
 export const insertCategorySchema = createInsertSchema(categories).omit({
   id: true, // L'ID viene generato automaticamente dal database
+  userId: true, // L'user ID viene iniettato dal backend
 });
 
 // Schema per validare l'inserimento di un nuovo conto
 export const insertAccountSchema = createInsertSchema(accounts).omit({
   id: true, // L'ID viene generato automaticamente
+  userId: true, // L'user ID viene iniettato dal backend
 });
 
 // Schema per validare l'inserimento di una nuova transazione
 export const insertTransactionSchema = createInsertSchema(transactions).omit({
   id: true, // L'ID viene generato automaticamente
+  userId: true, // L'user ID viene iniettato dal backend
   createdAt: true, // La data di creazione viene impostata automaticamente
 }).extend({
   // Trasformo la data da stringa a oggetto Date se necessario
@@ -115,6 +135,7 @@ export const insertTransactionSchema = createInsertSchema(transactions).omit({
 // Schema per validare l'inserimento di un nuovo budget
 export const insertBudgetSchema = createInsertSchema(budgets).omit({
   id: true, // L'ID viene generato automaticamente
+  userId: true, // L'user ID viene iniettato dal backend
 });
 
 // Schemi per l'autenticazione locale
