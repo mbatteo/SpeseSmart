@@ -31,6 +31,7 @@ export interface IStorage {
   createLocalUser(userData: { email: string; passwordHash: string; firstName: string; lastName: string }): Promise<User>;
   updateUserPassword(userId: string, passwordHash: string): Promise<void>;
   incrementUserTokenVersion(userId: string): Promise<void>;
+  initializeUserData(userId: string): Promise<void>;
   
   // Password reset token operations
   createPasswordResetToken(tokenData: InsertPasswordResetToken): Promise<PasswordResetToken>;
@@ -38,39 +39,36 @@ export interface IStorage {
   markPasswordResetTokenAsUsed(tokenId: string): Promise<void>;
   cleanupExpiredPasswordResetTokens(): Promise<void>;
   
-  // Transactions
-  getTransactions(): Promise<Transaction[]>;
-  getTransactionById(id: string): Promise<Transaction | undefined>;
-  createTransaction(transaction: InsertTransaction): Promise<Transaction>;
-  updateTransaction(id: string, transaction: Partial<InsertTransaction>): Promise<Transaction | undefined>;
-  deleteTransaction(id: string): Promise<boolean>;
+  // Transactions (per-user)
+  getTransactions(userId: string): Promise<Transaction[]>;
+  getTransactionById(userId: string, id: string): Promise<Transaction | undefined>;
+  createTransaction(userId: string, transaction: InsertTransaction): Promise<Transaction>;
+  updateTransaction(userId: string, id: string, transaction: Partial<InsertTransaction>): Promise<Transaction | undefined>;
+  deleteTransaction(userId: string, id: string): Promise<boolean>;
   
-  // Categories
-  getCategories(): Promise<Category[]>;
-  getCategoryById(id: string): Promise<Category | undefined>;
-  createCategory(category: InsertCategory): Promise<Category>;
-  updateCategory(id: string, category: Partial<InsertCategory>): Promise<Category | undefined>;
-  deleteCategory(id: string): Promise<boolean>;
+  // Categories (per-user)
+  getCategories(userId: string): Promise<Category[]>;
+  getCategoryById(userId: string, id: string): Promise<Category | undefined>;
+  createCategory(userId: string, category: InsertCategory): Promise<Category>;
+  updateCategory(userId: string, id: string, category: Partial<InsertCategory>): Promise<Category | undefined>;
+  deleteCategory(userId: string, id: string): Promise<boolean>;
   
-  // Accounts
-  getAccounts(): Promise<Account[]>;
-  getAccountById(id: string): Promise<Account | undefined>;
-  createAccount(account: InsertAccount): Promise<Account>;
-  updateAccount(id: string, account: Partial<InsertAccount>): Promise<Account | undefined>;
-  deleteAccount(id: string): Promise<boolean>;
+  // Accounts (per-user)
+  getAccounts(userId: string): Promise<Account[]>;
+  getAccountById(userId: string, id: string): Promise<Account | undefined>;
+  createAccount(userId: string, account: InsertAccount): Promise<Account>;
+  updateAccount(userId: string, id: string, account: Partial<InsertAccount>): Promise<Account | undefined>;
+  deleteAccount(userId: string, id: string): Promise<boolean>;
   
-  // Budgets
-  getBudgets(): Promise<Budget[]>;
-  getBudgetById(id: string): Promise<Budget | undefined>;
-  createBudget(budget: InsertBudget): Promise<Budget>;
-  updateBudget(id: string, budget: Partial<InsertBudget>): Promise<Budget | undefined>;
-  deleteBudget(id: string): Promise<boolean>;
+  // Budgets (per-user)
+  getBudgets(userId: string): Promise<Budget[]>;
+  getBudgetById(userId: string, id: string): Promise<Budget | undefined>;
+  createBudget(userId: string, budget: InsertBudget): Promise<Budget>;
+  updateBudget(userId: string, id: string, budget: Partial<InsertBudget>): Promise<Budget | undefined>;
+  deleteBudget(userId: string, id: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
-  constructor() {
-    this.initializeDefaultData();
-  }
 
   private normalizeAmount(value: number | string): string {
     if (typeof value === 'string') {
@@ -82,30 +80,31 @@ export class DatabaseStorage implements IStorage {
     return value.toFixed(2);
   }
 
-  private async initializeDefaultData() {
-    // Check if data already exists
-    const existingCategories = await db.select().from(categories).limit(1);
+  // Initialize default data for a new user
+  async initializeUserData(userId: string): Promise<void> {
+    // Check if user already has categories
+    const existingCategories = await db.select().from(categories).where(eq(categories.userId, userId)).limit(1);
     if (existingCategories.length > 0) return;
 
-    // Default categories
+    // Default categories for this user
     const defaultCategories = [
-      { name: 'Alimentari', color: '#EF4444', icon: 'fas fa-shopping-cart' },
-      { name: 'Trasporti', color: '#3B82F6', icon: 'fas fa-bus' },
-      { name: 'Shopping', color: '#10B981', icon: 'fas fa-shopping-bag' },
-      { name: 'Bollette', color: '#F59E0B', icon: 'fas fa-bolt' },
-      { name: 'Intrattenimento', color: '#8B5CF6', icon: 'fas fa-film' },
-      { name: 'Salute', color: '#EC4899', icon: 'fas fa-heartbeat' },
-      { name: 'Altro', color: '#6B7280', icon: 'fas fa-tag' },
+      { userId, name: 'Alimentari', color: '#EF4444', icon: 'fas fa-shopping-cart' },
+      { userId, name: 'Trasporti', color: '#3B82F6', icon: 'fas fa-bus' },
+      { userId, name: 'Shopping', color: '#10B981', icon: 'fas fa-shopping-bag' },
+      { userId, name: 'Bollette', color: '#F59E0B', icon: 'fas fa-bolt' },
+      { userId, name: 'Intrattenimento', color: '#8B5CF6', icon: 'fas fa-film' },
+      { userId, name: 'Salute', color: '#EC4899', icon: 'fas fa-heartbeat' },
+      { userId, name: 'Altro', color: '#6B7280', icon: 'fas fa-tag' },
     ];
 
     await db.insert(categories).values(defaultCategories);
 
-    // Default accounts
+    // Default accounts for this user
     const defaultAccounts = [
-      { name: 'Conto Corrente', type: 'checking', balance: '2500.00' },
-      { name: 'Carta di Credito', type: 'credit', balance: '0.00' },
-      { name: 'Carta di Debito', type: 'debit', balance: '500.00' },
-      { name: 'Contanti', type: 'cash', balance: '150.00' },
+      { userId, name: 'Conto Corrente', type: 'checking', balance: '2500.00' },
+      { userId, name: 'Carta di Credito', type: 'credit', balance: '0.00' },
+      { userId, name: 'Carta di Debito', type: 'debit', balance: '500.00' },
+      { userId, name: 'Contanti', type: 'cash', balance: '150.00' },
     ];
 
     await db.insert(accounts).values(defaultAccounts);
@@ -212,16 +211,19 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Transactions
-  async getTransactions(): Promise<Transaction[]> {
-    return await db.select().from(transactions).orderBy(transactions.date);
+  async getTransactions(userId: string): Promise<Transaction[]> {
+    return await db.select().from(transactions)
+      .where(eq(transactions.userId, userId))
+      .orderBy(transactions.date);
   }
 
-  async getTransactionById(id: string): Promise<Transaction | undefined> {
-    const [transaction] = await db.select().from(transactions).where(eq(transactions.id, id));
+  async getTransactionById(userId: string, id: string): Promise<Transaction | undefined> {
+    const [transaction] = await db.select().from(transactions)
+      .where(and(eq(transactions.userId, userId), eq(transactions.id, id)));
     return transaction;
   }
 
-  async createTransaction(insertTransaction: InsertTransaction): Promise<Transaction> {
+  async createTransaction(userId: string, insertTransaction: InsertTransaction): Promise<Transaction> {
     const date = typeof insertTransaction.date === 'string' 
       ? new Date(insertTransaction.date)
       : insertTransaction.date;
@@ -230,6 +232,7 @@ export class DatabaseStorage implements IStorage {
       .insert(transactions)
       .values({
         ...insertTransaction,
+        userId,
         date,
         amount: this.normalizeAmount(insertTransaction.amount as number | string),
       })
@@ -237,7 +240,7 @@ export class DatabaseStorage implements IStorage {
     return transaction;
   }
 
-  async updateTransaction(id: string, update: Partial<InsertTransaction>): Promise<Transaction | undefined> {
+  async updateTransaction(userId: string, id: string, update: Partial<InsertTransaction>): Promise<Transaction | undefined> {
     const updateData: any = { ...update };
     if (update.date) {
       updateData.date = typeof update.date === 'string' ? new Date(update.date) : update.date;
@@ -249,31 +252,34 @@ export class DatabaseStorage implements IStorage {
     const [transaction] = await db
       .update(transactions)
       .set(updateData)
-      .where(eq(transactions.id, id))
+      .where(and(eq(transactions.userId, userId), eq(transactions.id, id)))
       .returning();
     return transaction;
   }
 
-  async deleteTransaction(id: string): Promise<boolean> {
-    const result = await db.delete(transactions).where(eq(transactions.id, id));
+  async deleteTransaction(userId: string, id: string): Promise<boolean> {
+    const result = await db.delete(transactions)
+      .where(and(eq(transactions.userId, userId), eq(transactions.id, id)));
     return (result.rowCount ?? 0) > 0;
   }
 
-  // Categories
-  async getCategories(): Promise<Category[]> {
-    return await db.select().from(categories);
+  // Categories (per-user)
+  async getCategories(userId: string): Promise<Category[]> {
+    return await db.select().from(categories).where(eq(categories.userId, userId));
   }
 
-  async getCategoryById(id: string): Promise<Category | undefined> {
-    const [category] = await db.select().from(categories).where(eq(categories.id, id));
+  async getCategoryById(userId: string, id: string): Promise<Category | undefined> {
+    const [category] = await db.select().from(categories)
+      .where(and(eq(categories.userId, userId), eq(categories.id, id)));
     return category;
   }
 
-  async createCategory(insertCategory: InsertCategory): Promise<Category> {
+  async createCategory(userId: string, insertCategory: InsertCategory): Promise<Category> {
     const [category] = await db
       .insert(categories)
       .values({
         ...insertCategory,
+        userId,
         color: insertCategory.color || '#6B7280',
         icon: insertCategory.icon || 'fas fa-tag'
       })
@@ -281,70 +287,76 @@ export class DatabaseStorage implements IStorage {
     return category;
   }
 
-  async updateCategory(id: string, update: Partial<InsertCategory>): Promise<Category | undefined> {
+  async updateCategory(userId: string, id: string, update: Partial<InsertCategory>): Promise<Category | undefined> {
     const [category] = await db
       .update(categories)
       .set(update)
-      .where(eq(categories.id, id))
+      .where(and(eq(categories.userId, userId), eq(categories.id, id)))
       .returning();
     return category;
   }
 
-  async deleteCategory(id: string): Promise<boolean> {
-    const result = await db.delete(categories).where(eq(categories.id, id));
+  async deleteCategory(userId: string, id: string): Promise<boolean> {
+    const result = await db.delete(categories)
+      .where(and(eq(categories.userId, userId), eq(categories.id, id)));
     return (result.rowCount ?? 0) > 0;
   }
 
-  // Accounts
-  async getAccounts(): Promise<Account[]> {
-    return await db.select().from(accounts);
+  // Accounts (per-user)
+  async getAccounts(userId: string): Promise<Account[]> {
+    return await db.select().from(accounts).where(eq(accounts.userId, userId));
   }
 
-  async getAccountById(id: string): Promise<Account | undefined> {
-    const [account] = await db.select().from(accounts).where(eq(accounts.id, id));
+  async getAccountById(userId: string, id: string): Promise<Account | undefined> {
+    const [account] = await db.select().from(accounts)
+      .where(and(eq(accounts.userId, userId), eq(accounts.id, id)));
     return account;
   }
 
-  async createAccount(insertAccount: InsertAccount): Promise<Account> {
+  async createAccount(userId: string, insertAccount: InsertAccount): Promise<Account> {
     const [account] = await db
       .insert(accounts)
       .values({
         ...insertAccount,
+        userId,
         balance: insertAccount.balance || '0'
       })
       .returning();
     return account;
   }
 
-  async updateAccount(id: string, update: Partial<InsertAccount>): Promise<Account | undefined> {
+  async updateAccount(userId: string, id: string, update: Partial<InsertAccount>): Promise<Account | undefined> {
     const [account] = await db
       .update(accounts)
       .set(update)
-      .where(eq(accounts.id, id))
+      .where(and(eq(accounts.userId, userId), eq(accounts.id, id)))
       .returning();
     return account;
   }
 
-  async deleteAccount(id: string): Promise<boolean> {
-    const result = await db.delete(accounts).where(eq(accounts.id, id));
+  async deleteAccount(userId: string, id: string): Promise<boolean> {
+    const result = await db.delete(accounts)
+      .where(and(eq(accounts.userId, userId), eq(accounts.id, id)));
     return (result.rowCount ?? 0) > 0;
   }
 
-  // Budgets
-  async getBudgets(): Promise<Budget[]> {
-    return await db.select().from(budgets);
+  // Budgets (per-user)
+  async getBudgets(userId: string): Promise<Budget[]> {
+    return await db.select().from(budgets).where(eq(budgets.userId, userId));
   }
 
-  async getBudgetById(id: string): Promise<Budget | undefined> {
-    const [budget] = await db.select().from(budgets).where(eq(budgets.id, id));
+  async getBudgetById(userId: string, id: string): Promise<Budget | undefined> {
+    const [budget] = await db.select().from(budgets)
+      .where(and(eq(budgets.userId, userId), eq(budgets.id, id)));
     return budget;
   }
 
-  async createBudget(insertBudget: InsertBudget): Promise<Budget> {
+  async createBudget(userId: string, insertBudget: InsertBudget): Promise<Budget> {
     const [budget] = await db
       .insert(budgets)
       .values({
         ...insertBudget,
+        userId,
         period: insertBudget.period || 'monthly',
         month: insertBudget.month || null
       })
@@ -352,17 +364,18 @@ export class DatabaseStorage implements IStorage {
     return budget;
   }
 
-  async updateBudget(id: string, update: Partial<InsertBudget>): Promise<Budget | undefined> {
+  async updateBudget(userId: string, id: string, update: Partial<InsertBudget>): Promise<Budget | undefined> {
     const [budget] = await db
       .update(budgets)
       .set(update)
-      .where(eq(budgets.id, id))
+      .where(and(eq(budgets.userId, userId), eq(budgets.id, id)))
       .returning();
     return budget;
   }
 
-  async deleteBudget(id: string): Promise<boolean> {
-    const result = await db.delete(budgets).where(eq(budgets.id, id));
+  async deleteBudget(userId: string, id: string): Promise<boolean> {
+    const result = await db.delete(budgets)
+      .where(and(eq(budgets.userId, userId), eq(budgets.id, id)));
     return (result.rowCount ?? 0) > 0;
   }
 }
