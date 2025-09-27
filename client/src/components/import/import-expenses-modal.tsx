@@ -273,19 +273,34 @@ export default function ImportExpensesModal() {
         }
 
         // Cerca la categoria corrispondente se c'è una colonna categoria
-        let finalCategoryId = mapping.defaultCategoryId;
+        let finalCategoryId = '';
         let isConfirmed = false;
-        let rawCategory = undefined; // Solo se c'è un match
+        let rawCategory = undefined;
+        
+        // Trova o crea la categoria "Non classificato" per i casi senza match
+        const unclassifiedCategory = categories.find(cat => cat.name === 'Non classificato');
         
         if (importedCategory.trim()) {
+          // C'è una categoria nella riga CSV
           const matchedCategory = findMatchingCategory(importedCategory, categories);
           if (matchedCategory) {
+            // Trovato match: usa la categoria matchata
             finalCategoryId = matchedCategory.id;
-            rawCategory = importedCategory.trim(); // Salva solo se c'è match
-            isConfirmed = false; // Preselezionata ma non confermata
+            rawCategory = importedCategory.trim();
+            isConfirmed = false;
+          } else {
+            // NON trovato match: usa categoria "Non classificato" per indicare che va verificata
+            finalCategoryId = unclassifiedCategory?.id || mapping.defaultCategoryId || '';
+            rawCategory = importedCategory.trim(); // Mantieni il testo originale per debug
+            isConfirmed = false; // Sarà mostrata come "preselezionata" ma da verificare
           }
-          // Se non c'è match, usa categoria di default e NON salva rawCategory
-          // Questo farà sì che lo stato sia "missing" (rosso) invece di "preselected" (giallo)
+        } else {
+          // NON c'è categoria nella riga CSV: usa quella predefinita se impostata
+          if (mapping.defaultCategoryId) {
+            finalCategoryId = mapping.defaultCategoryId;
+          } else if (unclassifiedCategory) {
+            finalCategoryId = unclassifiedCategory.id;
+          }
         }
 
         return {
