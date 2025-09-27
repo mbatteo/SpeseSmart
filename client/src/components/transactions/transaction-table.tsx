@@ -249,16 +249,18 @@ export default function TransactionTable({
                             size="sm"
                             onClick={() => onEdit(transaction)}
                             data-testid={`button-edit-${transaction.id}`}
+                            className="hover:bg-blue-50"
                           >
-                            <i className="fas fa-edit text-slate-400 hover:text-primary-500" />
+                            <i className="fas fa-edit text-lg text-blue-500 hover:text-blue-700" />
                           </Button>
                           <Button
                             variant="ghost"
                             size="sm"
                             onClick={() => onDelete(transaction.id)}
                             data-testid={`button-delete-${transaction.id}`}
+                            className="hover:bg-red-50"
                           >
-                            <i className="fas fa-trash text-slate-400 hover:text-red-500" />
+                            <i className="fas fa-trash text-lg text-red-500 hover:text-red-700" />
                           </Button>
                         </div>
                       </td>
