@@ -249,7 +249,7 @@ export default function TransactionTable({
                       </td>
                       <td className="py-4 px-6 text-right">
                         <span className="font-semibold text-red-600" data-testid={`amount-${transaction.id}`}>
-                          -{formatCurrency(parseFloat(transaction.amount))}
+                          {formatCurrency(parseFloat(transaction.amount))}
                         </span>
                       </td>
                       <td className="py-4 px-6 text-center">

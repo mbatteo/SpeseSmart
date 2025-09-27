@@ -13,7 +13,8 @@ import {
 const BCRYPT_ROUNDS = parseInt(process.env.BCRYPT_ROUNDS || '12');
 const RESET_TOKEN_EXPIRY = parseInt(process.env.RESET_TOKEN_EXPIRY || '3600'); // 1 hour in seconds
 const RESET_TOKEN_BYTES = parseInt(process.env.RESET_TOKEN_BYTES || '32');
-const APP_URL = process.env.APP_URL || 'https://your-repl-name.your-username.repl.co';
+const APP_URL = process.env.APP_URL || 'http://localhost:3000';
+//const APP_URL = process.env.APP_URL || 'https://your-repl-name.your-username.repl.co';
 
 // Rate limiting maps (in-memory for simplicity, use Redis in production)
 const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
@@ -169,12 +170,24 @@ export function setupLocalAuth(app: Express) {
       };
 
       // Usa req.login di Passport per impostare correttamente la sessione
-      await new Promise<void>((resolve, reject) => {
+     /* await new Promise<void>((resolve, reject) => {
         req.login(userObject, (err) => {
           if (err) reject(err);
           else resolve();
         });
       });
+      */
+     await new Promise<void>((resolve, reject) => {
+  req.login(userObject, (err) => {
+    if (err) {
+      console.error('req.login error:', err);
+      return reject(err);
+    }
+    console.log('Session after login (req.session):', req.session);
+    console.log('req.sessionID:', req.sessionID);
+    resolve();
+  });
+});
 
       // Log evento di sicurezza
       console.log(`[SECURITY] User logged in: ${user.id} (${email}) from IP: ${clientIp}`);
