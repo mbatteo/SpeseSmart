@@ -33,23 +33,33 @@ export default function TransactionTable({
 
   // Funzione per determinare lo stato di una transazione
   const getTransactionStatus = (transaction: Transaction) => {
-    // Se non c'è categoria importata e non è confermata → Rosso (mancante)
-    if (!transaction.importedCategoryRaw && !transaction.confirmed) {
-      return { status: 'missing', color: 'red', label: 'Categoria mancante' };
-    }
+    const category = getCategoryById(transaction.categoryId);
+    const isUnclassified = category?.name === 'Non classificato';
     
-    // Se c'è categoria importata ma non confermata → Giallo (preselezionata)
-    if (transaction.importedCategoryRaw && !transaction.confirmed) {
-      return { status: 'preselected', color: 'yellow', label: 'Preselezionata da import' };
-    }
-    
-    // Se è confermata manualmente → Verde (confermata)
+    // Se è confermata manualmente → Verde (qualunque caso)
     if (transaction.confirmed) {
       return { status: 'confirmed', color: 'green', label: 'Confermata manualmente' };
     }
     
+    // Se è importata da CSV
+    if (transaction.importedCategoryRaw) {
+      // Se ha fatto match esatto (categoria diversa da "Non classificato") → Giallo
+      if (!isUnclassified) {
+        return { status: 'preselected', color: 'yellow', label: 'Match da CSV - da confermare' };
+      }
+      // Se non ha fatto match (categoria è "Non classificato") → Rosso  
+      else {
+        return { status: 'missing', color: 'red', label: 'Nessun match CSV - rivedere categoria' };
+      }
+    }
+    
+    // Se creata manualmente ma non confermata (non dovrebbe succedere) → Verde
+    if (!transaction.importedCategoryRaw) {
+      return { status: 'confirmed', color: 'green', label: 'Creata manualmente' };
+    }
+    
     // Default: rosso
-    return { status: 'missing', color: 'red', label: 'Categoria mancante' };
+    return { status: 'missing', color: 'red', label: 'Categoria da verificare' };
   };
 
   // Funzione per gestire il cambio categoria

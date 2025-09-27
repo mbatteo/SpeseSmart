@@ -54,7 +54,14 @@ export default function Dashboard() {
 
   const handleAddTransaction = async (data: any) => {
     try {
-      await apiRequest("POST", "/api/transactions", data);
+      // Le transazioni create manualmente sono sempre confermate
+      const transactionData = {
+        ...data,
+        confirmed: true,
+        importedCategoryRaw: null // Non è un import
+      };
+      
+      await apiRequest("POST", "/api/transactions", transactionData);
       queryClient.invalidateQueries({ queryKey: ['/api/transactions'] });
       queryClient.invalidateQueries({ queryKey: ['/api/analytics/monthly-summary'] });
       toast({
