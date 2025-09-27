@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { CheckCircle, AlertCircle, XCircle } from "lucide-react";
+import { CheckCircle, AlertCircle, XCircle, Edit, Trash2 } from "lucide-react";
 
 interface TransactionTableProps {
   transactions: Transaction[];
@@ -249,18 +249,18 @@ export default function TransactionTable({
                             size="sm"
                             onClick={() => onEdit(transaction)}
                             data-testid={`button-edit-${transaction.id}`}
-                            className="hover:bg-blue-50"
+                            className="hover:bg-blue-50 p-2"
                           >
-                            <i className="fas fa-edit text-lg text-blue-500 hover:text-blue-700" />
+                            <Edit className="h-4 w-4 text-blue-500 hover:text-blue-700" />
                           </Button>
                           <Button
                             variant="ghost"
                             size="sm"
                             onClick={() => onDelete(transaction.id)}
                             data-testid={`button-delete-${transaction.id}`}
-                            className="hover:bg-red-50"
+                            className="hover:bg-red-50 p-2"
                           >
-                            <i className="fas fa-trash text-lg text-red-500 hover:text-red-700" />
+                            <Trash2 className="h-4 w-4 text-red-500 hover:text-red-700" />
                           </Button>
                         </div>
                       </td>
