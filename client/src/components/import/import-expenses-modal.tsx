@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Upload, FileText, AlertCircle, CheckCircle } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { queryClient } from "@/lib/queryClient";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { Category, Account } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -47,23 +47,29 @@ export default function ImportExpensesModal() {
 
   const importMutation = useMutation({
     mutationFn: async (transactions: ImportedTransaction[]) => {
-      const promises = transactions.map(transaction => 
-        fetch('/api/transactions', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
+      const promises = transactions.map(async (transaction, index) => {
+        try {
+          const response = await apiRequest('POST', '/api/transactions', {
             ...transaction,
             amount: parseFloat(transaction.amount),
             importedCategoryRaw: transaction.importedCategoryRaw || null,
             confirmed: transaction.confirmed || false
-          })
-        }).then(res => {
-          if (!res.ok) throw new Error('Errore nell\'importazione');
-          return res.json();
-        })
-      );
+          });
+          return await response.json();
+        } catch (error: any) {
+          console.error(`Errore transazione ${index + 1}:`, error);
+          // Estraggo informazioni più dettagliate dall'errore
+          if (error.message.includes('401')) {
+            throw new Error(`Sessione scaduta. Rieffettua il login e riprova.`);
+          } else if (error.message.includes('400')) {
+            throw new Error(`Dati non validi per la transazione "${transaction.description}". Controlla importo e formato data.`);
+          } else if (error.message.includes('500')) {
+            throw new Error(`Errore del server durante l'importazione della transazione "${transaction.description}".`);
+          } else {
+            throw new Error(`Errore nell'importazione della transazione "${transaction.description}": ${error.message}`);
+          }
+        }
+      });
       return Promise.all(promises);
     },
     onSuccess: () => {
@@ -76,10 +82,11 @@ export default function ImportExpensesModal() {
       setOpen(false);
       resetForm();
     },
-    onError: () => {
+    onError: (error: any) => {
+      console.error('Errore importazione:', error);
       toast({
-        title: "Errore",
-        description: "Errore durante l'importazione delle transazioni.",
+        title: "Errore nell'importazione",
+        description: error.message || "Errore durante l'importazione delle transazioni. Controlla i dati e riprova.",
         variant: "destructive",
       });
     },
