@@ -244,91 +244,134 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Route per ottenere statistiche mensili della dashboard con dati dinamici
+  // Route per ottenere statistiche mensili della dashboard - TUTTI DATI REALI DAL DATABASE
   app.get("/api/analytics/monthly-summary", isAuthenticated, async (req: any, res) => {
     try {
-      // Recupero tutti i dati necessari dal database per l'utente
-      const userId = req.user.claims.sub;
-      const transactions = await storage.getTransactions(userId);
-      const categories = await storage.getCategories(userId);
-      const accounts = await storage.getAccounts(userId);
+      // PASSO 1: Recupero tutti i dati necessari dal database per l'utente corrente
+      const userId = req.user.claims.sub; // ID univoco dell'utente autenticato
+      const transactions = await storage.getTransactions(userId); // Tutte le transazioni dell'utente
+      const categories = await storage.getCategories(userId); // Tutte le categorie dell'utente
+      const accounts = await storage.getAccounts(userId); // Tutti i conti dell'utente
+      const budgets = await storage.getBudgets(userId); // Tutti i budget impostati dall'utente
       
-      // Calcolo le date per questo mese e il mese scorso
-      const now = new Date();
-      const currentMonth = now.getMonth();
-      const currentYear = now.getFullYear();
+      // PASSO 2: Calcolo le date per filtrare le transazioni
+      const now = new Date(); // Data e ora corrente
+      const currentMonth = now.getMonth(); // Mese corrente (0-11)
+      const currentYear = now.getFullYear(); // Anno corrente
       
-      // Data di inizio del mese corrente
-      const startOfMonth = new Date(currentYear, currentMonth, 1);
-      // Data di inizio del mese scorso
-      const startOfLastMonth = new Date(currentYear, currentMonth - 1, 1);
-      // Data di inizio di questo mese (per confrontare con il mese scorso)
-      const endOfLastMonth = new Date(currentYear, currentMonth, 0);
+      // Date di riferimento per il mese corrente
+      const startOfMonth = new Date(currentYear, currentMonth, 1); // Primo giorno del mese
       
-      // Filtro transazioni del mese corrente
+      // Date di riferimento per il mese scorso (per fare confronti)
+      const startOfLastMonth = new Date(currentYear, currentMonth - 1, 1); // Primo giorno mese scorso
+      const endOfLastMonth = new Date(currentYear, currentMonth, 0); // Ultimo giorno mese scorso
+      
+      // PASSO 3: Filtro le transazioni del mese corrente
       const monthlyTransactions = transactions.filter(t => {
         const transactionDate = new Date(t.date);
+        // Controllo che la transazione sia dello stesso mese e anno corrente
         return transactionDate.getMonth() === currentMonth && 
                transactionDate.getFullYear() === currentYear;
       });
 
-      // Filtro transazioni del mese scorso per il confronto
+      // PASSO 4: Filtro le transazioni del mese scorso (per calcolare la variazione percentuale)
       const lastMonthTransactions = transactions.filter(t => {
         const transactionDate = new Date(t.date);
+        // Controllo che la transazione sia tra inizio e fine del mese scorso
         return transactionDate >= startOfLastMonth && transactionDate <= endOfLastMonth;
       });
 
-      // Filtro transazioni di oggi
+      // PASSO 5: Filtro le transazioni di oggi (per mostrare l'attività giornaliera)
       const today = new Date();
       const todayTransactions = transactions.filter(t => {
         const transactionDate = new Date(t.date);
+        // Confronto solo la data (ignoro l'ora) per trovare transazioni di oggi
         return transactionDate.toDateString() === today.toDateString();
       });
 
-      // Calcolo le statistiche principali
+      // PASSO 6: Calcolo le statistiche principali sulle spese
+      // Sommo tutte le transazioni del mese (i valori negativi sono spese)
       const totalExpenses = monthlyTransactions.reduce((sum, t) => sum + parseFloat(t.amount), 0);
+      // Sommo tutte le transazioni del mese scorso (per il confronto)
       const lastMonthExpenses = lastMonthTransactions.reduce((sum, t) => sum + parseFloat(t.amount), 0);
+      // Conto il numero totale di transazioni del mese
       const transactionCount = monthlyTransactions.length;
+      // Calcolo la media giornaliera dividendo il totale per i giorni trascorsi nel mese
       const dailyAverage = totalExpenses / now.getDate();
       
-      // Calcolo il confronto percentuale con il mese scorso
+      // PASSO 7: Calcolo la variazione percentuale rispetto al mese scorso
+      // Formula: ((valore_corrente - valore_precedente) / valore_precedente) * 100
       const monthlyChange = lastMonthExpenses !== 0 
         ? ((totalExpenses - lastMonthExpenses) / Math.abs(lastMonthExpenses)) * 100 
-        : 0;
+        : 0; // Se non ci sono spese nel mese scorso, la variazione è 0
       
-      // Calcolo transazioni di oggi
+      // PASSO 8: Conto quante transazioni sono state fatte oggi
       const todayTransactionCount = todayTransactions.length;
       
-      // Determino il trend della media giornaliera
-      const lastWeekAverage = totalExpenses / 7; // Media ultimi 7 giorni del mese
+      // PASSO 9: Determino il trend della media giornaliera (in crescita, calo o stabile)
+      const lastWeekAverage = totalExpenses / 7; // Stima media degli ultimi giorni
+      // Se la media giornaliera è >10% rispetto alla settimana scorsa → "In crescita"
+      // Se la media giornaliera è <10% rispetto alla settimana scorsa → "In calo"
+      // Altrimenti → "Stabile"
       const trendStatus = dailyAverage > lastWeekAverage * 1.1 ? 'In crescita' 
                         : dailyAverage < lastWeekAverage * 0.9 ? 'In calo' 
                         : 'Stabile';
 
+      // PASSO 10: Calcolo quanto è stato speso per ogni categoria nel mese corrente
       const categorySpending = categories.map(category => {
+        // Filtro solo le transazioni di questa categoria nel mese corrente
         const categoryTransactions = monthlyTransactions.filter(t => t.categoryId === category.id);
+        // Sommo tutte le transazioni di questa categoria
         const total = categoryTransactions.reduce((sum, t) => sum + parseFloat(t.amount), 0);
         return {
-          ...category,
-          amount: total,
-          percentage: totalExpenses > 0 ? (total / totalExpenses) * 100 : 0
+          ...category, // Includo tutti i dati della categoria (nome, colore, icona, ecc.)
+          amount: total, // Totale speso in questa categoria
+          percentage: totalExpenses > 0 ? (total / totalExpenses) * 100 : 0 // Percentuale sul totale
         };
-      }).sort((a, b) => b.amount - a.amount);
+      }).sort((a, b) => b.amount - a.amount); // Ordino per spesa (dalla più alta alla più bassa)
 
-      // Creo la risposta JSON con tutti i dati dinamici calcolati
+      // PASSO 11: Calcolo il budget totale REALE dell'utente (non più hardcodato!)
+      // Filtro i budget del mese corrente (periodo = 'monthly' e stesso mese/anno)
+      // Il budget ha campi separati per 'year' (es: "2025") e 'month' (es: "09" per settembre)
+      const currentMonthStr = String(currentMonth + 1).padStart(2, '0'); // Converto mese 0-11 in "01"-"12"
+      const currentYearStr = String(currentYear); // Anno corrente come stringa
+      
+      const monthlyBudgets = budgets.filter(b => {
+        // Filtro solo i budget mensili con year e month corrispondenti
+        if (b.period === 'monthly') {
+          return b.year === currentYearStr && b.month === currentMonthStr;
+        }
+        return false;
+      });
+      
+      // Sommo tutti i budget mensili impostati dall'utente per questo mese
+      const totalBudget = monthlyBudgets.reduce((sum, b) => sum + parseFloat(b.amount), 0);
+      
+      // Calcolo il budget rimanente REALE: budget totale meno le spese fatte
+      // Se l'utente non ha impostato budget, mostro 0
+      const remainingBudget = totalBudget > 0 ? totalBudget - Math.abs(totalExpenses) : 0;
+      
+      // Calcolo la percentuale di budget utilizzata REALE
+      // Se non c'è budget impostato, mostro 0% (evito divisione per zero)
+      const budgetUsedPercentage = totalBudget > 0 
+        ? (Math.abs(totalExpenses) / totalBudget) * 100 
+        : 0;
+
+      // PASSO 12: Creo la risposta JSON con TUTTI I DATI REALI calcolati dal database
       res.json({
-        totalExpenses, // Spese totali del mese
-        transactionCount, // Numero transazioni del mese
-        dailyAverage, // Media giornaliera delle spese
-        categorySpending, // Spese per categoria con percentuali
-        remainingBudget: 4000 - totalExpenses, // Budget rimanente (TODO: rendere dinamico)
-        budgetUsedPercentage: totalExpenses / 4000 * 100, // Percentuale budget utilizzata
-        // Nuovi dati dinamici per sostituire quelli hardcodati
-        monthlyChange, // Variazione percentuale vs mese scorso
-        todayTransactionCount, // Numero transazioni di oggi
-        trendStatus, // Trend della media giornaliera
+        totalExpenses, // Spese totali del mese REALI
+        transactionCount, // Numero transazioni del mese REALI
+        dailyAverage, // Media giornaliera REALE
+        categorySpending, // Spese per categoria REALI con percentuali
+        remainingBudget, // Budget rimanente REALE (calcolato dai budget dell'utente)
+        budgetUsedPercentage, // Percentuale budget utilizzata REALE
+        monthlyChange, // Variazione percentuale vs mese scorso REALE
+        todayTransactionCount, // Numero transazioni di oggi REALI
+        trendStatus, // Trend della media giornaliera REALE
       });
     } catch (error) {
+      // In caso di errore nel calcolo, loggo l'errore e restituisco messaggio al client
+      console.error('Error calculating monthly summary:', error);
       res.status(500).json({ message: "Errore nel calcolo delle statistiche" });
     }
   });
