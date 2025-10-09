@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import type { Category } from "@shared/schema";
@@ -6,14 +7,20 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import EditCategoryModal from "@/components/categories/edit-category-modal";
 
 export default function Categories() {
   const { toast } = useToast();
+  
+  // STATO: tracking della categoria in modifica e apertura modal
+  const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
   const { data: categories = [], isLoading } = useQuery<Category[]>({
     queryKey: ['/api/categories'],
   });
 
+  // FUNZIONE: Gestisce l'eliminazione di una categoria
   const handleDeleteCategory = async (id: string) => {
     try {
       await apiRequest("DELETE", `/api/categories/${id}`);
@@ -28,6 +35,45 @@ export default function Categories() {
         description: "Errore nell'eliminazione della categoria",
         variant: "destructive",
       });
+    }
+  };
+
+  // FUNZIONE: Apre il modal di modifica per una categoria specifica
+  const handleEditClick = (category: Category) => {
+    setEditingCategory(category);
+    setIsEditModalOpen(true);
+  };
+
+  // FUNZIONE: Gestisce il salvataggio delle modifiche alla categoria
+  const handleUpdateCategory = async (data: { 
+    name: string; 
+    color: string; 
+    localizedName?: string; 
+    alias?: string[];
+    icon?: string;
+  }) => {
+    if (!editingCategory) return;
+
+    try {
+      // Invio richiesta PUT al backend per aggiornare la categoria
+      await apiRequest("PUT", `/api/categories/${editingCategory.id}`, data);
+      
+      // Invalido la cache per ricaricare le categorie aggiornate
+      queryClient.invalidateQueries({ queryKey: ['/api/categories'] });
+      
+      // Mostro notifica di successo
+      toast({
+        title: "Successo",
+        description: "Categoria aggiornata con successo",
+      });
+    } catch (error) {
+      // In caso di errore, mostro notifica
+      toast({
+        title: "Errore",
+        description: "Errore nell'aggiornamento della categoria",
+        variant: "destructive",
+      });
+      throw error; // Rilancio per gestione nel modal
     }
   };
 
@@ -90,10 +136,17 @@ export default function Categories() {
               </CardHeader>
               <CardContent>
                 <div className="flex justify-end space-x-2">
-                  <Button variant="outline" size="sm" data-testid={`button-edit-${category.id}`}>
+                  {/* PULSANTE: Apre modal di modifica per questa categoria */}
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => handleEditClick(category)}
+                    data-testid={`button-edit-${category.id}`}
+                  >
                     <i className="fas fa-edit mr-1" />
                     Modifica
                   </Button>
+                  {/* PULSANTE: Elimina la categoria */}
                   <Button 
                     variant="outline" 
                     size="sm"
@@ -122,6 +175,16 @@ export default function Categories() {
           </div>
         )}
       </div>
+
+      {/* MODAL: Modifica categoria - appare quando editingCategory è valorizzato */}
+      {editingCategory && (
+        <EditCategoryModal
+          category={editingCategory}
+          open={isEditModalOpen}
+          onOpenChange={setIsEditModalOpen}
+          onSubmit={handleUpdateCategory}
+        />
+      )}
     </div>
   );
 }
