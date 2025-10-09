@@ -28,6 +28,16 @@ Application language: Italian interface and messages.
 ✓ **Italian Interface**: All new authentication pages and messages maintain Italian language consistency
 ✓ **Email Configuration**: Flexible email system with SMTP support and console fallback for development
 
+## Recent Changes (October 9, 2025)
+
+✓ **Dashboard Real Data**: Fixed budget calculation to use real user data instead of hardcoded 4000€ value
+✓ **Italian Code Comments**: Added extensive Italian comments throughout backend (routes.ts) and frontend (dashboard.tsx, stats-cards.tsx) explaining each operation
+✓ **Category Edit Modal**: Implemented complete category editing functionality with modal popup
+✓ **Category Alias System**: Added alias field (array of strings) to categories table for better CSV matching
+✓ **Color Picker Integration**: Dual color input (native picker + hex code input) synchronized for category colors
+✓ **Tag Management UI**: Interactive alias management with add/remove functionality in category edit modal
+✓ **Localized Names**: Support for English translations in category names for international matching
+
 ## System Architecture
 
 ### Frontend Architecture
@@ -54,7 +64,7 @@ Application language: Italian interface and messages.
 - **Schema**: Drizzle ORM schema definitions for PostgreSQL
 - **Tables**: 
   - `transactions` - Financial transactions with amount, description, date, category, and account references
-  - `categories` - Expense categories with customizable colors and icons
+  - `categories` - Expense categories with customizable colors, icons, localized names, and alias array for CSV matching
   - `accounts` - Bank accounts, credit cards, and cash accounts with balances
   - `budgets` - Monthly/yearly budget limits per category
   - `users` - Extended user profiles with email, name, password_hash, email_verified, token_version for dual authentication
@@ -62,7 +72,7 @@ Application language: Italian interface and messages.
   - `sessions` - Session storage for authentication with PostgreSQL backend
 - **Relationships**: Proper foreign key relationships between transactions, categories, accounts, and users
 - **Security**: Bcrypt password hashing, secure token generation, and session management
-- **CSV Import**: Advanced CSV parsing with column mapping, date format detection, and transaction preview
+- **CSV Import**: Advanced CSV parsing with column mapping, date format detection, transaction preview, and alias-based category matching
 
 ### Authentication & Authorization
 - **Dual Authentication System**: Complete authentication supporting both Replit OAuth and local email/password
