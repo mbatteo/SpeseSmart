@@ -10,6 +10,7 @@ export const categories = pgTable("categories", {
   userId: varchar("user_id").references(() => users.id, { onDelete: 'cascade' }).notNull(), // Proprietario della categoria
   name: text("name").notNull(), // Nome della categoria (es: "Alimentari")
   localizedName: text("localized_name"), // Nome localizzato per matching fallback (es: "Groceries" per "Alimentari")
+  alias: text("alias").array(), // Array di alias/nomi alternativi per il matching (es: ["supermercato", "spesa", "grocery"])
   color: text("color").notNull().default('#6B7280'), // Colore per visualizzare la categoria
   icon: text("icon").notNull().default('fas fa-tag'), // Icona della categoria
 }, (table) => [

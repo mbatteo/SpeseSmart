@@ -1,0 +1,92 @@
+Obiettivo:
+Aggiornare la pagina Categories in modo che cliccando sul pulsante “Modifica” accanto a una categoria, si apra una finestra pop-up che consenta di modificare i seguenti campi della categoria:
+
+name → Nome della categoria
+
+color → Colore (tramite color picker o input di codice esadecimale)
+
+localizedName → Traduzione inglese (campo localized_name nel DB)
+
+alias → Array di stringhe (nomi alternativi della categoria)
+
+Dettagli funzionali richiesti:
+
+Apertura pop-up
+
+Quando l’utente clicca su “Modifica” nella tabella o lista categorie, deve aprirsi un modal (popup) centrato con i campi precompilati con i valori esistenti della categoria.
+
+Sfondo semi-trasparente dietro al pop-up.
+
+Campi del form nel pop-up
+
+Nome (name): campo di testo semplice.
+
+Colore (color):
+
+Mostrare un input di tipo color (color picker nativo).
+
+Accanto, anche un input testo per scrivere il codice esadecimale (sincronizzato con il color picker).
+
+Localized name (localizedName): campo testo per la traduzione inglese.
+
+Alias:
+
+Dev’essere un elenco dinamico di alias già associati, ognuno con un pulsante “Modifica” e “Elimina”.
+
+Sotto, un campo di input con un pulsante “Aggiungi alias” per aggiungerne di nuovi.
+
+L’utente può aggiungere o rimuovere alias liberamente prima di salvare.
+
+Gli alias vanno salvati nel DB come array di stringhe.
+
+Bottoni nel pop-up
+
+“Salva modifiche” → aggiorna la categoria tramite API (PATCH o PUT).
+
+“Annulla” → chiude il pop-up senza salvare.
+
+Validazioni base
+
+name e localizedName non vuoti.
+
+color in formato valido (esadecimale o selezione).
+
+Nessun alias vuoto nell’array.
+
+Aggiornamento DB
+
+Aggiornare i campi nel DB:
+
+{
+  name: string,
+  color: string,
+  localized_name: string,
+  alias: string[]
+}
+
+
+Endpoint API (se non esiste ancora):
+PATCH /api/categories/:id
+→ aggiorna i campi ricevuti nel corpo della richiesta.
+
+UX suggerita per gli alias
+
+Lista con chip stile “tag” (ognuno con pulsante per eliminarlo).
+
+Campo input in fondo per aggiungerne uno nuovo.
+
+Possibile libreria d’interfaccia: react-tag-input oppure implementazione custom con Tailwind + gestione stato locale.
+
+
+
+Aggiornare la pagina Categories per aprire il modal al click sul pulsante “Modifica”.
+
+Output finale atteso:
+
+Pop-up reattivo per la modifica della categoria.
+
+Tutti i campi modificabili.
+
+Alias gestibili facilmente come tag.
+
+Salvataggio persistente a DB e aggiornamento immediato della lista categorie.
