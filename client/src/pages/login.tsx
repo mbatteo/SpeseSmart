@@ -81,14 +81,14 @@ export default function Login() {
               <CardTitle className="text-2xl font-bold text-gray-900 dark:text-white">
                 Accedi al tuo Account
               </CardTitle>
-              <CardDescription className="text-gray-600 dark:text-gray-300">
-                Scegli come vuoi accedere alla tua dashboard
-              </CardDescription>
+              
             </CardHeader>
 
-            <CardContent className="space-y-6">
-              {/* Replit Auth Option */}
+           <CardContent className="space-y-6">
+             {/* Replit Auth Option */}
+             
               <div className="space-y-4">
+              {/* 
                 <Button 
                   className="w-full bg-blue-600 hover:bg-blue-700 text-white"
                   onClick={() => window.location.href = '/api/login'}
@@ -97,14 +97,13 @@ export default function Login() {
                   <Shield className="mr-2 h-4 w-4" />
                   Accedi con Replit
                 </Button>
-
+              */}
                 <div className="relative">
-                  <div className="absolute inset-0 flex items-center">
+                 {/* linea separatore
+                 <div className="absolute inset-0 flex items-center">
                     <Separator className="w-full" />
                   </div>
-                  <div className="relative flex justify-center text-xs uppercase">
-                    <span className="bg-white dark:bg-slate-800 px-2 text-gray-500">oppure</span>
-                  </div>
+                  */}
                 </div>
               </div>
 
@@ -157,7 +156,7 @@ export default function Login() {
                     )}
                   />
 
-                  <div className="text-right">
+                  <div className="text-center">
                     <Link href="/forgot-password">
                       <span className="text-sm text-blue-600 hover:text-blue-700 cursor-pointer" data-testid="link-forgot-password">
                         Password dimenticata?
